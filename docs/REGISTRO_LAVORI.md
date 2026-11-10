@@ -48,6 +48,9 @@ L'emulatore locale (`tests/mock-supabase.mjs`) riproduce le API usate dall'app s
 ## Turni Staff 2026-27 (PDF)
 Non importati: li inserisce Mario dall'app («Pianifica turni»). Il PDF presentava colonne con giorni della settimana non coerenti con le date e mesi da febbraio vuoti.
 
+## Difetti trovati nel collaudo
+- 10/11: il blocco delle registrazioni pubbliche (trigger) impediva a Mario di creare account. Causa: Supabase inserisce l'utente prima di confermarlo. Rimosso il trigger; resta la protezione RLS (un account senza profilo non vede nulla). I test locali non lo rilevavano perché l'emulatore crea gli utenti già confermati.
+
 ## Limiti residui dichiarati
 - Nessun OCR per i PDF scansionati: si trascrivono guardando l'originale. Tesseract potrebbe essere aggiunto in seguito, ma non in modo affidabile per schede tecniche.
 - Nessuna notifica push: andrebbero concordate e testate su iPhone (iOS 16.4+ solo con app installata).
