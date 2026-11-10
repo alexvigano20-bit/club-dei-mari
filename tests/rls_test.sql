@@ -3,6 +3,8 @@
 -- Uso: ./scripts/local-db-reset.sh && psql ... -d cdm_test -f tests/rls_test.sql
 -- =====================================================================
 \set ON_ERROR_STOP 1
+-- Le date del test seguono l'ora italiana, come l'app (in CI il server è in UTC)
+set timezone = 'Europe/Rome';
 create schema test;
 create table test.results(n serial, name text, ok boolean, detail text);
 grant usage on schema test to authenticated, anon; grant all on all tables in schema test to authenticated, anon;

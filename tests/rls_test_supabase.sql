@@ -1,4 +1,5 @@
 
+set timezone = 'Europe/Rome';
 create schema test;
 create table test.results(n serial, name text, ok boolean, detail text);
 grant usage on schema test to authenticated, anon; grant all on all tables in schema test to authenticated, anon;
