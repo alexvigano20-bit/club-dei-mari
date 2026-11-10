@@ -2,12 +2,13 @@
 // Mette in cache SOLO i file dell'app (interfaccia). I dati del club (turni,
 // allenamenti, PDF) NON passano mai da questa cache: arrivano dal server con
 // l'autorizzazione dell'utente, così una revoca ha effetto anche offline-online.
-const VERSION = 'cdm-shell-2026-11-11-2';
+const VERSION = 'cdm-shell-2026-11-11-3';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/core.js', './js/api.js', './js/config.js', './js/admin.js', './js/workouts.js', './js/workout-parse.js', './js/availability.js', './js/icons.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon-48.png',
   './img/logo-tondo.webp', './img/scritta.webp',
+  './img/menu/mine.webp', './img/menu/work.webp', './img/menu/calendar.webp', './img/menu/notices.webp',
 ];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

@@ -190,6 +190,7 @@ summary{cursor:pointer;font-weight:700;padding:8px 0}
 
 /* Icone del club (SVG) */
 .ico{display:inline-flex;align-items:center;justify-content:center}
-.ico svg{display:block;width:100%;height:100%}
-.tile .ico{width:52px;height:52px}
-.bottomnav button .ico{width:30px;height:30px}
+.ico{overflow:hidden;border-radius:12px;box-shadow:0 1px 3px rgba(13,74,143,.25)}
+.ico img{display:block;width:100%;height:100%;object-fit:cover}
+.tile .ico{width:76px;height:57px}
+.bottomnav button .ico{width:40px;height:30px;border-radius:7px;box-shadow:none}
