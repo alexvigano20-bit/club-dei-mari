@@ -1,8 +1,9 @@
 // Club dei Mari · Gestione Club (solo Mario) e Registro presenze
 import { rpc, callFunction } from './api.js';
+import { availSummaryHtml, addOptions, confirmRest } from './availability.js';
 import {
   $, esc, S, R, A, act, toast, isAdmin, canAttendance, staffName, activeStaff, human, humanShort, dt, hhmm, KIND,
-  activityLabel, todayISO, printHtml, printHeader, download, csv, openRequests, closeSheet,
+  activityLabel, todayISO, printHtml, printHeader, download, csv, openRequests, closeSheet, availOf,
 } from './core.js';
 
 const back = '<button class="alt" style="width:100%;margin-top:16px" data-act="go" data-view="home">⌂ Torna alla pagina iniziale</button>';
@@ -26,7 +27,7 @@ export function dayAdminHtml(a, date) {
       return `<div class="checkline"><span class="who">${esc(staffName(s.profile_id))}<br><span class="small">${r === 'ci_sono' ? '✓ ha confermato' : r === 'non_ci_sono' ? '✕ non c\'è' : 'nessuna risposta'}</span></span>
         <button class="warn sm" data-act="unassign" data-id="${s.id}" data-name="${esc(staffName(s.profile_id))}">Togli</button></div>`;
     }).join('')}
-    ${a.status === 'attiva' ? `<div class="row" style="align-items:center"><select id="as-${a.id}" style="flex:2;margin:6px 0"><option value="">— assegna istruttore —</option>${free.map((p) => `<option value="${p.id}">${esc(p.display_name)}</option>`).join('')}</select>
+    ${a.status === 'attiva' ? `<div class="row" style="align-items:center"><select id="as-${a.id}" style="flex:2;margin:6px 0"><option value="">— assegna istruttore —</option>${addOptions(a, free)}</select>
       <button class="sm" data-act="assign" data-id="${a.id}" style="flex:1">Assegna</button></div>` : ''}
     <details><summary>Modifica attività</summary>${activityForm(a, a.date)}</details>
     <button class="${a.status === 'attiva' ? 'warn' : 'ok'} sm" data-act="actStatus" data-id="${a.id}" data-s="${a.status === 'attiva' ? 'annullata' : 'attiva'}">${a.status === 'attiva' ? 'Annulla attività (es. piscina chiusa)' : 'Ripristina attività'}</button>`;
@@ -54,7 +55,8 @@ A.saveActivity = (el) => {
 };
 A.assign = (el) => {
   const p = $('as-' + el.dataset.id).value; if (!p) return toast('Scegli l\'istruttore', true);
-  const date = S.data.activities.find((a) => a.id === el.dataset.id)?.date;
+  const a = S.data.activities.find((x) => x.id === el.dataset.id); const date = a?.date;
+  if (!confirmRest(p, a.date, a.kind)) return;
   act(() => rpc('admin_assign', { p_activity: el.dataset.id, p_profile: p }), 'Turno assegnato', { button: el }).then((ok) => ok && reopenDay(date));
 };
 A.unassign = (el) => {
@@ -324,12 +326,13 @@ export function renderPlan(main) {
       <button style="width:100%" data-act="planWeekday">Assegna per tutto il mese</button>
       <p class="small">Es. «Aldo a tutti i mercoledì»: chi è già assegnato non viene duplicato; le serate annullate sono saltate.</p></div>
     <div class="card"><h3>Turni nel mese per persona</h3><div class="row" style="gap:6px">${staff.map((p) => `<span class="pill ${count.get(p.id) ? '' : 'grey'}">${esc(p.display_name)} · ${count.get(p.id) || 0}</span>`).join('')}</div></div>
+    ${availSummaryHtml(P.month, staff)}
     <div class="row"><button class="alt" data-act="planPrint">🖨️ Stampa il piano del mese</button></div>
     ${acts.map((a) => { const assigned = new Set(a.assignments.map((s) => s.profile_id)); return `<div class="card ${a.status === 'annullata' ? 'soft' : ''}" style="padding:12px">
       <b>${esc(humanShort(a.date))}</b> · ${esc(KIND[a.kind])}${a.start_time ? ' · ' + hhmm(a.start_time) : ''}${a.title ? ' · ' + esc(a.title) : ''}${a.status === 'annullata' ? ' <span class="pill red">annullata</span>' : ''}${a.provisional ? ' <span class="pill gold">da verificare</span>' : ''}
       <div class="row" style="gap:6px;margin:8px 0">${a.assignments.map((s) => { const r = S.data.responses?.[s.id];
         return `<button class="alt sm" data-act="planRemove" data-id="${s.id}" data-name="${esc(staffName(s.profile_id))}" aria-label="Togli ${esc(staffName(s.profile_id))}">${r === 'ci_sono' ? '✓ ' : r === 'non_ci_sono' ? '⚠ ' : ''}${esc(staffName(s.profile_id))} ✕</button>`; }).join('') || '<span class="small">nessuno assegnato</span>'}</div>
-      ${a.status === 'attiva' ? `<select data-change="planAdd" data-a="${a.id}" aria-label="Aggiungi istruttore" style="margin:0"><option value="">＋ aggiungi…</option>${staff.filter((p) => !assigned.has(p.id) && canTeach(p, a.kind)).map((p) => `<option value="${p.id}">${esc(p.display_name)}</option>`).join('')}</select>` : ''}
+      ${a.status === 'attiva' ? `<select data-change="planAdd" data-a="${a.id}" aria-label="Aggiungi istruttore" style="margin:0"><option value="">＋ aggiungi…</option>${addOptions(a, staff.filter((p) => !assigned.has(p.id) && canTeach(p, a.kind)))}</select>` : ''}
     </div>`; }).join('')}`}
     <p class="small">✓ ha confermato · ⚠ ha detto «Non ci sono». Per orari, note o annullare una serata tocca il giorno nel Calendario.</p>
     ${back}`;
@@ -338,15 +341,24 @@ export function renderPlan(main) {
 const keepY = (p) => { const y = window.scrollY; return p.then((r) => { window.scrollTo(0, y); return r; }); };
 A.planMonth = (el) => { P.month = shiftMonth(P.month, +el.dataset.n); const { from, to } = monthRange(P.month);
   if (from < S.range.from || to > S.range.to) { S.range = { from: from < S.range.from ? from : S.range.from, to: to > S.range.to ? to : S.range.to }; act(async () => {}, null); } else R.render(); window.scrollTo(0, 0); };
-A.planAdd = (el) => { if (!el.value) return; keepY(act(() => rpc('admin_assign', { p_activity: el.dataset.a, p_profile: el.value }), 'Assegnato')); };
+A.planAdd = (el) => {
+  if (!el.value) return;
+  const a = S.data.activities.find((x) => x.id === el.dataset.a);
+  const no = availOf(el.value, a.id) === false;
+  if ((no && !confirm(`${staffName(el.value)} ha dichiarato che quella sera NON c'è. Assegnarlo comunque?`)) || (!no && !confirmRest(el.value, a.date, a.kind))) { el.value = ''; return; }
+  keepY(act(() => rpc('admin_assign', { p_activity: el.dataset.a, p_profile: el.value }), 'Assegnato'));
+};
 A.planRemove = (el) => { if (!confirm(`Togliere ${el.dataset.name} da questa serata?`)) return; keepY(act(() => rpc('admin_unassign', { p_assignment: el.dataset.id }), 'Tolto', { button: el })); };
 A.planCombo = (el) => { P.combo = el.value; P.person = $('qPerson').value; R.render(); };
 A.planWeekday = (el) => {
   const p = $('qPerson').value; if (!p) return toast('Scegli la persona', true);
   const [dow, kind] = $('qCombo').value.split('|'); P.person = p; P.combo = $('qCombo').value;
   const { from, to } = monthRange(P.month);
+  if (!confirmRest(p, from, kind)) return;
+  const skipped = S.data.activities.filter((a) => a.date >= from && a.date <= to && a.kind === kind && a.status === 'attiva'
+    && String(new Date(a.date + 'T12:00').getDay() || 7) === dow && availOf(p, a.id) === false).length;
   keepY(act(() => rpc('admin_assign_weekday', { p_profile: p, p_from: from, p_to: to, p_isodow: +dow, p_kind: kind }), null, { button: el }))
-    .then((n) => { if (n !== false) toast(n ? `${staffName(p)} assegnato a ${n} serate` : 'Nessuna serata nuova da assegnare'); });
+    .then((n) => { if (n !== false) toast(`${n ? `${staffName(p)} assegnato a ${n} serate` : 'Nessuna serata nuova da assegnare'}${skipped ? ` (saltate ${skipped} in cui ha detto che non c'è)` : ''}`); });
 };
 A.planQuickSeries = (el) => {
   const { from, to } = monthRange(P.month);

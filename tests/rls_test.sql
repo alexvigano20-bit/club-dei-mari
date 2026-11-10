@@ -219,6 +219,25 @@ create temp table ss3 as select public.admin_save_season(null, 'Prossima', curre
 grant select on ss3 to authenticated;
 select test.ok(((select r from ss3)->>'adopted')::int = 1 and test.rows($$select 1 from public.activities where date = current_date + 200 and kind='corso'$$) = 1, 'Stagione: serata già inserita adottata, nessun doppione');
 
+-- Disponibilità dichiarate
+select set_config('request.jwt.claim.sub', :'fabio', false);
+create temp table av as select array_agg(id order by date) ids from public.activities where kind='allenamento' and date > current_date and date <= current_date + 30;
+grant select on av to authenticated;
+select test.ok(public.set_my_availability((select ids[1:3] from av), false) = 3, 'Staff: dichiara le serate in cui NON c''è');
+select public.set_my_availability((select ids[4:5] from av), true);
+select public.set_my_availability_note(current_date, 'Lavoro a turni: il martedì finisco alle 22');
+select test.fails($$select public.set_my_availability(array[(select id from public.activities where date < current_date limit 1)], true)$$, 'Disponibilità: niente dichiarazioni su serate passate');
+select test.ok(test.rows($$select 1 from public.declared_availability$$) = 5, 'Staff: vede le proprie disponibilità');
+select set_config('request.jwt.claim.sub', :'i1', false);
+select test.ok(test.rows($$select 1 from public.declared_availability$$) = 0 and test.rows($$select 1 from public.availability_notes$$) = 0, 'Staff: non vede le disponibilità altrui');
+select set_config('request.jwt.claim.sub', :'mario', false);
+select test.ok(test.rows($$select 1 from public.declared_availability$$) = 5 and test.rows($$select 1 from public.availability_notes$$) = 1, 'Mario: vede tutte le disponibilità e le note');
+select test.ok(((public.app_availability(current_date, current_date + 40))->'items') is not null, 'Mario: lettura disponibilità per l''app');
+create temp table aw as select public.admin_assign_weekday(:'fabio', current_date, current_date + 30, extract(isodow from (select date from public.activities where id = (select ids[1] from av)))::int, 'allenamento') n;
+select test.ok(not exists (select 1 from public.assignments s where s.profile_id = '00000000-0000-0000-0000-00000000000f' and s.removed_at is null and s.activity_id = (select ids[1] from av))
+  and (select n from aw) >= 1,
+  'Assegnazione rapida: salta le serate dichiarate «non ci sono»');
+
 reset role;
 \echo
 select case when ok then 'OK   ' else 'FAIL ' end || name || coalesce('  ['||detail||']','') as risultato from test.results order by n;

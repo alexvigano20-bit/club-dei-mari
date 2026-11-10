@@ -100,8 +100,10 @@ export function defaultRange() {
 
 export async function loadState() {
   S.range = S.range || defaultRange();
-  const [data, workouts] = await Promise.all([rpc('app_state', { p_from: S.range.from, p_to: S.range.to }), rpc('app_workouts')]);
+  const [data, workouts, avail] = await Promise.all([rpc('app_state', { p_from: S.range.from, p_to: S.range.to }), rpc('app_workouts'),
+    rpc('app_availability', { p_from: S.range.from, p_to: S.range.to })]);
   if (!data?.me) { const e = new ApiError('Il tuo accesso è stato disattivato.', { status: 403, code: 'revoked' }); throw e; }
+  data.avail = avail || { items: [], notes: [] };
   S.me = data.me; S.data = data; S.workouts = workouts; S.fromCache = false; S.cacheTime = Date.now();
   saveCache();
 }
@@ -138,3 +140,11 @@ export const sheetOpen = () => !$('sheet').classList.contains('hidden');
 // ---------- Azioni (nessun onclick inline: compatibile con la Content-Security-Policy) ----------
 // Gli elementi usano data-act="nome" (click) o data-change="nome" (change/input).
 export const A = {};
+
+// ---------- Disponibilità dichiarate ----------
+// true = c'è, false = non c'è, undefined = non dichiarato
+export function availOf(profileId, activityId) {
+  const it = (S.data?.avail?.items || []).find((x) => x.p === profileId && x.a === activityId);
+  return it ? it.v : undefined;
+}
+export const availNote = (profileId, ym) => (S.data?.avail?.notes || []).find((n) => n.p === profileId && String(n.m).startsWith(ym))?.note || '';

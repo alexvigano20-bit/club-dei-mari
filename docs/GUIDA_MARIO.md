@@ -24,6 +24,12 @@ Gestione Club → nome → Gestisci → «Reimposta password». Comunica la pass
 - «Turni nel mese per persona» ti mostra quanti turni ha ciascuno; «Stampa il piano del mese» per il foglio.
 - ✓ accanto al nome = ha confermato; ⚠ = ha detto «Non ci sono».
 
+## Disponibilità dello staff
+- Ognuno dichiara, mese per mese, le serate in cui c'è o non c'è, con una nota (es. «il martedì arrivo alle 21:30»).
+- In «Pianifica turni» apri «Disponibilità dichiarate»: vedi chi ha risposto, le note e chi non ha ancora dichiarato (puoi sollecitarlo su WhatsApp).
+- Nel menu «＋ aggiungi» compaiono prima i disponibili; l'app ti avvisa se assegni chi ha detto di non esserci, o chi ha allenato il mese prima (mese di scarico).
+- L'assegnazione rapida «a tutti i mercoledì» salta le serate in cui la persona ha detto di non esserci.
+
 ## Calendario
 - **Serate ricorrenti con orari:** Gestione Club → Calendario → «Crea serate ricorrenti». Per esempio dal 14/09 al 15/06, lun/mer/ven, Allenamento, 21:00.
 - **Assegnare:** Calendario → tocca il giorno → scegli l'istruttore → «Assegna».

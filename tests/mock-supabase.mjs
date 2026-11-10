@@ -46,7 +46,7 @@ async function loadProcs() {
 function lit(v) {
   if (v === null || v === undefined) return 'null';
   if (typeof v === 'boolean' || typeof v === 'number') return String(v);
-  if (Array.isArray(v) && v.length && v.every((x) => typeof x === 'number')) return q(`{${v.join(',')}}`);
+  if (Array.isArray(v) && v.length && v.every((x) => typeof x === 'number' || typeof x === 'string')) return q(`{${v.map((x) => typeof x === 'string' ? `"${x}"` : x).join(',')}}`);
   if (typeof v === 'object') return `${q(JSON.stringify(v))}::jsonb`;
   return q(v);
 }

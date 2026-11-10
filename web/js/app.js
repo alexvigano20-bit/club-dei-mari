@@ -7,9 +7,10 @@ import {
   myAssignments, responseOf, openRequests, printHtml, printHeader, openSheet, closeSheet, sheetOpen, defaultRange,
 } from './core.js';
 import { renderWork } from './workouts.js';
+import { renderAvail, homeAvailBanner } from './availability.js';
 import { renderAdmin, renderAttendance, renderPlan, dayAdminHtml, replacementForm } from './admin.js';
 
-const VIEWS = ['home', 'mine', 'work', 'calendar', 'notices', 'admin', 'attendance', 'plan', 'tour'];
+const VIEWS = ['home', 'mine', 'work', 'calendar', 'notices', 'admin', 'attendance', 'plan', 'avail', 'tour'];
 let selectedDay = null;
 let calMonthsBack = 0;
 
@@ -30,7 +31,7 @@ async function boot() {
   }
   if (S.me.must_change_password) return renderChangePassword(true);
   route(location.hash.slice(1) || 'home', true);
-  if (!localSeen('tour')) go('tour');
+  if (!localSeen('tour.v2')) go('tour');
 }
 
 function handleAuthFailure(e) {
@@ -84,7 +85,7 @@ function renderLogin(message = '') {
       await signIn($('email').value, $('password').value);
       await loadState();
       if (S.me.must_change_password) return renderChangePassword(true);
-      route('home'); if (!localSeen('tour')) go('tour');
+      route('home'); if (!localSeen('tour.v2')) go('tour');
     } catch (err) {
       if (err.code === 'revoked') wipeLocal();
       $('loginErr').innerHTML = `<div class="error">${esc(err.message)}</div>`;
@@ -112,7 +113,7 @@ function renderChangePassword(first) {
     if (a !== b) return ($('pwErr').innerHTML = '<div class="error">Le due password non coincidono.</div>');
     try {
       await changePassword(a); await rpc('mark_password_changed'); await loadState();
-      toast('Password salvata'); route('home'); if (!localSeen('tour')) go('tour');
+      toast('Password salvata'); route('home'); if (!localSeen('tour.v2')) go('tour');
     } catch (err) { $('pwErr').innerHTML = `<div class="error">${esc(err.message)}</div>`; }
   });
 }
@@ -150,7 +151,7 @@ function render() {
   $('app').classList.toggle('wide', S.view === 'work');
   const main = $('main');
   ({ home: renderHome, mine: renderMine, work: renderWork, calendar: renderCalendar, notices: renderNotices,
-     admin: renderAdmin, attendance: renderAttendance, plan: renderPlan, tour: renderTour })[S.view](main);
+     admin: renderAdmin, attendance: renderAttendance, plan: renderPlan, avail: renderAvail, tour: renderTour })[S.view](main);
 }
 R.render = render;
 
@@ -181,6 +182,7 @@ function renderHome(main) {
       <button class="tile" data-act="go" data-view="calendar"><span>📅</span>Calendario</button>
       <button class="tile" data-act="go" data-view="notices"><span>🔔</span>Comunicazioni${open ? `<span class="count">${open} sostituzione/i</span>` : ''}</button>
     </div>
+    ${homeAvailBanner()}
     <div class="card"><h3>Il tuo prossimo turno</h3>
       ${next.length ? next.map(({ activity: a, assignment: s }) => `<div class="item"><span class="tag">${esc(KIND[a.kind])}</span>
         <p><b>${esc(human(a.date))}</b>${a.start_time ? ' · ' + hhmm(a.start_time) : ''}<br>
@@ -229,6 +231,7 @@ function renderMine(main) {
   const next = all.filter((x) => x.activity.date >= t);
   const past = all.filter((x) => x.activity.date < t).reverse();
   main.innerHTML = `<h2>I miei turni</h2>
+    <button class="alt" style="width:100%;margin-bottom:8px" data-act="availOpen">Le mie disponibilità (mese per mese)</button>
     <div class="row"><button data-act="printMine">🖨️ Stampa / Salva PDF</button></div>
     <p class="muted">Turni assegnati da Mario. Rispondi «Ci sono» o «Non ci sono»: se non puoi, Mario organizza la sostituzione.</p>
     ${next.length ? next.map((x) => shiftCard(x, true)).join('') : '<div class="card">Nessun turno in programma.</div>'}
@@ -379,11 +382,13 @@ const insertAnnouncement = (title, body) => rpc('post_announcement', { p_title: 
 // ======================= GUIDA =======================
 const tourSteps = () => [
   ['Benvenuto al Club dei Mari', 'I quattro pulsanti in basso sono sempre a portata di pollice: I miei turni, Allenamenti, Calendario, Comunicazioni (una bacheca di avvisi). La Guida resta in alto a destra.'],
+  ['Le tue disponibilità', 'Per prima cosa indica i tuoi impegni: da «I miei turni» → «Le mie disponibilità» scegli il mese e segna le serate in cui ci sei (✓) e quelle in cui non puoi (✕), per lavoro a turni, orari o viaggi. Puoi aggiungere una nota, per esempio «il martedì arrivo alle 21:30». Puoi aggiornarle in qualsiasi momento durante l\'anno, mese per mese: Mario le usa per preparare i turni.'],
   ['I tuoi turni', 'Mario assegna i turni. Su ogni tuo turno puoi toccare «Ci sono» o «Non ci sono». Non puoi assegnarti turni da solo né spostarli.'],
   ['Conferma e presenza sono diverse', 'Rispondere nell\'app non è la presenza ufficiale, e non rispondere non vuol dire essere assenti. Il registro cartaceo in piscina resta valido.'],
   ['Sostituzioni', '«Non ci sono» invia una richiesta a Mario, che sceglie il sostituto (anche concordandolo su WhatsApp).'],
   ['Allenamenti', 'Le schede pubblicate da Fabio e Mario si leggono, si stampano e si salvano in PDF. I contenuti tecnici non vanno modificati.'],
   ...(isAdmin() ? [['Pianifica turni', 'Dalla pagina iniziale apri «Pianifica turni». La prima volta imposti la stagione: da che giorno a che giorno, in che giorni e a che ora ci sono allenamenti e corsi. Poi, mese per mese, assegni chi segue ogni serata, anche «a tutti i mercoledì» con un tocco.'], ['Gestione Club', 'Staff e accessi, sostituzioni, registro presenze, esportazioni.']] : []),
+  ...(isAdmin() ? [['Disponibilità dello staff', 'In «Pianifica turni» vedi le disponibilità dichiarate da ognuno, con le note, e chi non ha ancora risposto. Nel menu «＋ aggiungi» i disponibili compaiono per primi, e l\'app ti avvisa se assegni qualcuno che ha detto di non esserci o che ha allenato il mese prima (mese di scarico). Questa funzione verrà migliorata ancora per aiutarti a programmare i turni degli istruttori.']] : []),
   ...(canWorkouts() ? [['Caricare un allenamento', 'In «Allenamenti» tocca «Carica PDF». L\'app propone le schede: confrontale con l\'originale, correggi e solo dopo tocca «Approva e pubblica».']] : []),
   ['Stampa', 'In Turni, Calendario e Allenamenti trovi «Stampa / Salva PDF»: sul telefono scegli «Salva come PDF» nel menu di stampa.'],
   ['Privacy', 'L\'app conserva solo nome, email, turni, risposte e presenze. Gli altri vedono nome, turni e sostituzioni da organizzare; email, risposte e presenze di tutti solo il responsabile. Dati su server UE; presenze cancellate dopo 12 mesi. Per vedere, correggere o cancellare i tuoi dati: info@clubdeimari.com.'],
@@ -397,7 +402,7 @@ function renderTour(main) {
 }
 A.tourNext = () => { if (tourStep >= tourSteps().length - 1) return A.tourEnd(); tourStep++; render(); };
 A.tourBack = () => { tourStep = Math.max(0, tourStep - 1); render(); };
-A.tourEnd = () => { markSeen('tour'); tourStep = 0; route('home'); };
+A.tourEnd = () => { markSeen('tour.v2'); tourStep = 0; route('home'); };
 
 // ======================= AZIONI GENERALI =======================
 A.go = (el) => route(el.dataset.view);

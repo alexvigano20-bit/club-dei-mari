@@ -32,6 +32,8 @@ async function login(d, email, tourSkip = true) {
 }
 const shot = (d, n) => d.page.screenshot({ path: `${SHOTS}/${n}.png`, fullPage: false });
 const printed = async (d, n) => { await d.page.waitForFunction((k) => window.__prints >= k, n, { timeout: 5000 }); return d.page.evaluate(() => window.__printed || ''); };
+// sceglie l'opzione il cui testo inizia con il nome (le etichette ora includono la disponibilità)
+const pick = async (loc, name) => { const v = await loc.locator('option').evaluateAll((os, n) => os.find((o) => o.textContent.startsWith(n))?.value, name); return loc.selectOption(v); };
 const nav = (d, label) => d.page.click(`.bottomnav button:has-text("${label}")`);
 
 try {
@@ -42,7 +44,7 @@ try {
   await i1.page.waitForSelector('.error'); ok(await i1.page.isVisible('text=Email o password non corretti'), 'Login: password errata rifiutata con messaggio chiaro');
   await i1.page.fill('#password', PW); await i1.page.click('button[type=submit]');
   await i1.page.waitForSelector('.tour'); await shot(i1, '02-guida'); ok(true, 'Guida mostrata al primo accesso');
-  ok(await i1.page.isVisible('text=PASSO 1 DI 7'), 'Guida istruttore: 7 passi (niente Pianifica/Gestione/Caricare allenamenti)');
+  ok(await i1.page.isVisible('text=PASSO 1 DI 8'), 'Guida istruttore: 8 passi (niente Pianifica/Gestione/Caricare allenamenti)');
   await i1.page.click('text=Salta la guida'); await i1.page.waitForSelector('.hero'); await shot(i1, '03-home-istruttore');
   ok(!(await i1.page.isVisible('text=Gestione Club')), 'Istruttore: Gestione Club non visibile');
   ok(await i1.page.isVisible('.bottomnav button:has-text("I miei turni")') && await i1.page.isVisible('.bottomnav button:has-text("Comunicazioni")'), 'Quattro tasti fissi in basso');
@@ -79,7 +81,7 @@ try {
   // assegnazione da calendario
   await nav(mario, 'Calendario'); await mario.page.locator('.monthcard.current ~ .monthcard .day.has').first().click();
   await mario.page.waitForSelector('#sheet >> text=Gestione (solo Mario)');
-  const asel = mario.page.locator('#sheet select[id^="as-"]').first(); await asel.selectOption({ label: 'Fabio (prova)' });
+  const asel = mario.page.locator('#sheet select[id^="as-"]').first(); await pick(asel, 'Fabio (prova)');
   await mario.page.locator('#sheet button:has-text("Assegna")').first().click(); await mario.page.waitForSelector('#sheet >> text=Fabio (prova)');
   ok(true, 'Mario assegna un turno dal calendario'); await shot(mario, '10-mario-giorno'); await mario.page.click('.sheet-close');
 
@@ -90,7 +92,7 @@ try {
   // ---------- 3. Fabio: PDF → bozze → revisione → pubblicazione ----------
   const fabio = await device('fabio-iphone', 'iPhone 13');
   await fabio.page.goto(APP); await fabio.page.fill('#email', 'fabio@prova.invalid'); await fabio.page.fill('#password', PW); await fabio.page.click('button[type=submit]');
-  await fabio.page.waitForSelector('.tour'); ok(await fabio.page.isVisible('text=PASSO 1 DI 8'), 'Guida Fabio: 8 passi (con «Caricare un allenamento», senza Gestione)');
+  await fabio.page.waitForSelector('.tour'); ok(await fabio.page.isVisible('text=PASSO 1 DI 9'), 'Guida Fabio: 9 passi (con «Caricare un allenamento», senza Gestione)');
   await fabio.page.click('text=Salta la guida');
   ok(!(await fabio.page.isVisible('text=Gestione Club')), 'Fabio: niente Gestione Club');
   await nav(fabio, 'Allenamenti'); await fabio.page.waitForSelector('text=Carica PDF'); await shot(fabio, '11-allenamenti-fabio');
@@ -144,7 +146,7 @@ try {
   await mario.page.click('button:has-text("Assegna per tutto il mese")'); await mario.page.waitForSelector('#toast:has-text("assegnato a")');
   ok(true, 'Pianifica turni: assegnazione rapida a tutti i giorni X del mese', await mario.page.textContent('#toast'));
   const chips = await mario.page.locator('button[data-act="planRemove"]:has-text("Fabio (prova)")').count(); ok(chips >= 2, 'Pianifica turni: nomi visibili su ogni serata', `${chips}`);
-  await mario.page.locator('select[data-change="planAdd"]').first().selectOption({ label: 'Istruttore Prova Due' }); await mario.page.waitForSelector('#toast:has-text("Assegnato")');
+  await pick(mario.page.locator('select[data-change="planAdd"]').first(), 'Istruttore Prova Due'); await mario.page.waitForSelector('#toast:has-text("Assegnato")');
   ok(true, 'Pianifica turni: aggiunta con un tocco');
   await shot(mario, '22-pianifica-turni');
   // Stagione: giorni e orari di allenamenti e corsi
@@ -161,6 +163,22 @@ try {
   await mario.page.goto(APP + '#plan'); await mario.page.waitForSelector('text=Assegnazione rapida');
   const opts = await mario.page.locator('#qPerson option').allTextContents();
   ok(!opts.includes('Istruttore Prova Due'), 'Istruttore «solo corsi» escluso dagli allenamenti');
+  // Disponibilità: l'istruttore dichiara il mese successivo, Mario le vede
+  await nav(i2, 'I miei turni'); await i2.page.click('button:has-text("Le mie disponibilità")');
+  await i2.page.waitForSelector('h2:has-text("Le mie disponibilità")');
+  await i2.page.click('[data-act="availMonth"][data-n="1"]'); await i2.page.waitForSelector('button:has-text("Non ci sono per tutto il mese")');
+  await i2.page.click('button:has-text("Non ci sono per tutto il mese")'); await i2.page.waitForSelector('#toast:has-text("non ci sei per tutto il mese")');
+  await i2.page.fill('#availNote', 'In viaggio tutto il mese'); await i2.page.click('[data-act="availNoteSave"]'); await i2.page.waitForSelector('#toast:has-text("Nota salvata")');
+  await shot(i2, '24-disponibilita');
+  ok(await i2.page.locator('[data-act="availToggle"].warn').count() >= 4, 'Disponibilità: serate del mese segnate «non ci sono»');
+  await mario.page.goto(APP + '#plan'); await mario.page.reload(); await mario.page.waitForSelector('h2:has-text("Pianifica turni")');
+  await mario.page.click('[data-act="planMonth"][data-n="1"]'); await mario.page.waitForSelector('text=Disponibilità dichiarate per');
+  await mario.page.click('summary:has-text("Disponibilità dichiarate per")');
+  ok(await mario.page.isVisible('text=Nota: In viaggio tutto il mese'), 'Mario: vede disponibilità e nota dell\'istruttore');
+  const corsoOpts = await mario.page.locator('select[data-change="planAdd"]').first().locator('option').allTextContents();
+  ok(corsoOpts.some((o) => /Istruttore Prova Due — NON disponibile/.test(o)) || corsoOpts.every((o) => !o.includes('Istruttore Prova Due')), 'Menu «aggiungi»: indica chi non è disponibile', corsoOpts.join(' | ').slice(0, 160));
+  await shot(mario, '25-pianifica-disponibilita');
+  await mario.page.goto(APP + '#plan'); await mario.page.reload(); await mario.page.waitForSelector('text=Assegnazione rapida');
   await mario.page.locator('button[data-act="planRemove"]').first().click(); await mario.page.waitForSelector('#toast:has-text("Tolto")'); ok(true, 'Pianifica turni: rimozione con conferma');
 
   // ---------- 5. Presenze: Mario registra, stampa, esporta CSV ----------

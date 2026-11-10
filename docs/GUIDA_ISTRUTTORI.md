@@ -6,6 +6,8 @@
 - iPhone: in Safari tocca Condividi e poi «Aggiungi alla schermata Home».
 - Android: in Chrome tocca il menu ⋮ e poi «Installa app».
 
+**Per prima cosa: le tue disponibilità.** Da «I miei turni» → «Le mie disponibilità» scegli il mese e segna le serate in cui ci sei (✓) e quelle in cui non puoi (✕), per lavoro, orari o viaggi; aggiungi una nota se serve. Puoi aggiornarle in qualsiasi momento durante l'anno. Le vede solo Mario, che le usa per fare i turni.
+
 In basso ci sono sempre quattro pulsanti:
 
 - **🙋 I miei turni**: i turni che ti ha assegnato Mario. Tocca **«Ci sono»** oppure **«Non ci sono»**. Con «Non ci sono» Mario riceve la richiesta e organizza lui la sostituzione. Se non rispondi non succede nulla: non vuol dire che sei assente.
