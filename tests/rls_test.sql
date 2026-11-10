@@ -211,6 +211,14 @@ select set_config('request.jwt.claim.sub', :'i1', false);
 select test.fails($$select public.admin_save_season(null, 'x', current_date + 500, current_date + 600, '[{"kind":"corso","isodow":1,"start":"20:00","end":"21:00"}]'::jsonb)$$, 'Istruttore: NON imposta la stagione');
 select test.ok(test.rows($$select 1 from public.seasons$$) = 1, 'Staff: vede la stagione');
 
+-- La stagione adotta le serate inserite a mano senza orario
+select set_config('request.jwt.claim.sub', :'mario', false);
+select public.admin_save_activity(null, current_date + 200, 'corso', null, null, null, null, false);
+create temp table ss3 as select public.admin_save_season(null, 'Prossima', current_date + 195, current_date + 205,
+  jsonb_build_array(jsonb_build_object('kind','corso','isodow',extract(isodow from current_date + 200)::int,'start','20:00','end','21:30'))) r;
+grant select on ss3 to authenticated;
+select test.ok(((select r from ss3)->>'adopted')::int = 1 and test.rows($$select 1 from public.activities where date = current_date + 200 and kind='corso'$$) = 1, 'Stagione: serata già inserita adottata, nessun doppione');
+
 reset role;
 \echo
 select case when ok then 'OK   ' else 'FAIL ' end || name || coalesce('  ['||detail||']','') as risultato from test.results order by n;

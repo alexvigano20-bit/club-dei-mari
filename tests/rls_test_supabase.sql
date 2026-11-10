@@ -1,9 +1,3 @@
--- Esecuzione dei test di sicurezza sul progetto Supabase REALE: tutto avviene in una transazione
--- che termina con un errore voluto, così ogni modifica viene annullata (rollback).
--- =====================================================================
--- Test di sicurezza e flussi (database locale con shim Supabase)
--- Uso: ./scripts/local-db-reset.sh && psql ... -d cdm_test -f tests/rls_test.sql
--- =====================================================================
 
 create schema test;
 create table test.results(n serial, name text, ok boolean, detail text);
@@ -19,34 +13,22 @@ end $$;
 create function test.rows(q text) returns int language plpgsql as $$
 declare n int; begin execute 'select count(*) from (' || q || ') x' into n; return n; end $$;
 grant execute on all functions in schema test to authenticated, anon;
-
--- Utenti di prova (nomi fittizi tranne i ruoli: NON dati reali)
-insert into auth.users(id,email) values
- ('00000000-0000-0000-0000-00000000000a','mario@test.invalid'),
- ('00000000-0000-0000-0000-00000000000f','fabio@test.invalid'),
- ('00000000-0000-0000-0000-0000000000a1','istruttore1@test.invalid'),
- ('00000000-0000-0000-0000-0000000000a2','istruttore2@test.invalid'),
- ('00000000-0000-0000-0000-0000000000a3','istruttore3@test.invalid');
+insert into auth.users(id,email,email_confirmed_at) values
+ ('00000000-0000-0000-0000-00000000000a','mario@test.invalid',now()),
+ ('00000000-0000-0000-0000-00000000000f','fabio@test.invalid',now()),
+ ('00000000-0000-0000-0000-0000000000a1','istruttore1@test.invalid',now()),
+ ('00000000-0000-0000-0000-0000000000a2','istruttore2@test.invalid',now()),
+ ('00000000-0000-0000-0000-0000000000a3','istruttore3@test.invalid',now());
 insert into public.profiles(id, display_name, is_admin, can_manage_workouts) values ('00000000-0000-0000-0000-00000000000a','Mario',true,true);
-insert into public.profile_private(id,email) values ('00000000-0000-0000-0000-00000000000a','mario@test.invalid');
+insert into public.profile_private(id,email) values ('00000000-0000-0000-0000-00000000000a','mario@test.invalid',now());
 update public.profiles set is_admin = false where id <> '00000000-0000-0000-0000-00000000000a';
 select test.fails($$select private.bootstrap_admin('fabio@test.invalid','X')$$, 'bootstrap: secondo responsabile rifiutato');
-
-
-
-
-
-
-
--- ANONIMO
 set role anon;
 select test.fails('select * from public.profiles', 'anon: niente accesso ai profili');
 select test.fails('select * from public.activities', 'anon: niente accesso al calendario');
 select test.fails($$select public.whoami()$$, 'anon: niente RPC');
 select test.ok(public.ping(), 'anon: ping consentito (keep-alive)');
 reset role;
-
--- MARIO crea lo staff
 set role authenticated; select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
 select test.ok((public.whoami()->>'is_admin')::boolean, 'Mario: whoami responsabile');
 select public.admin_create_profile('00000000-0000-0000-0000-00000000000f','Fabio','fabio@test.invalid', true, false);
@@ -66,8 +48,6 @@ select public.admin_assign((select a1 from ids), '00000000-0000-0000-0000-000000
 select test.ok(test.rows('select 1 from public.assignments where removed_at is null') = 2, 'Assegnazione doppia non duplicata');
 select test.fails($$select public.admin_set_active('00000000-0000-0000-0000-00000000000a', false)$$, 'Mario non può disattivare se stesso');
 select test.fails($$select public.admin_set_permissions('00000000-0000-0000-0000-00000000000a', false, true, true)$$, 'Deve restare almeno un responsabile');
-
--- ISTRUTTORE 1
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', false);
 select test.ok(test.rows('select 1 from public.activities') >= 12, 'Istruttore: vede il calendario staff');
 select test.fails($$select public.admin_assign((select a2 from ids), '00000000-0000-0000-0000-0000000000a1')$$, 'Istruttore: NON può autoassegnarsi');
@@ -77,27 +57,20 @@ select test.fails($$update public.assignments set removed_at = now()$$, 'Istrutt
 select test.ok(test.rows('select 1 from public.profile_private') = 0, 'Istruttore: non vede le email dello staff');
 select test.ok(test.rows('select 1 from public.audit_log') = 0, 'Istruttore: non vede il registro modifiche');
 select test.fails($$select public.admin_export_all()$$, 'Istruttore: NON esporta i dati');
--- risposta sul proprio turno
 select public.respond_assignment((select id from public.assignments where profile_id = auth.uid() and removed_at is null), 'ci_sono');
 select test.fails($$select public.respond_assignment((select id from public.assignments where profile_id = '00000000-0000-0000-0000-0000000000a2'), 'ci_sono')$$, 'Istruttore: NON risponde per un collega');
 select public.respond_assignment((select id from public.assignments where profile_id = auth.uid() and removed_at is null), 'non_ci_sono');
 select test.ok(test.rows($$select 1 from public.replacement_requests where status='aperta'$$) = 1, '«Non ci sono» apre una richiesta di sostituzione');
 select test.ok(test.rows('select 1 from public.availability_responses') = 1, 'Istruttore: vede solo la propria risposta');
 select test.fails($$select public.set_attendance((select a1 from ids), auth.uid(), 'presente')$$, 'Istruttore: NON registra presenze');
-
--- ISTRUTTORE 2 vede la richiesta aperta ma non la risposta del collega
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a2', false);
 select test.ok(test.rows($$select 1 from public.replacement_requests where status='aperta'$$) = 1, 'Staff: vede la sostituzione da organizzare');
 select test.ok(test.rows('select 1 from public.availability_responses') = 0, 'Staff: non vede le risposte altrui');
-
--- MARIO sceglie il sostituto
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
 select public.admin_resolve_replacement((select id from public.replacement_requests where status='aperta'), '00000000-0000-0000-0000-0000000000a3', 'Concordato su WhatsApp');
 select test.ok(test.rows($$select 1 from public.assignments where profile_id='00000000-0000-0000-0000-0000000000a3' and removed_at is null and replaces_id is not null$$) = 1, 'Sostituto assegnato e collegato al turno originale');
 select test.ok(test.rows($$select 1 from public.assignments where profile_id='00000000-0000-0000-0000-0000000000a1'$$) = 1, 'Turno originale conservato nello storico');
 select test.ok(test.rows($$select 1 from public.audit_log where table_name='assignments'$$) >= 4, 'Modifiche ai turni tracciate (audit)');
-
--- PRESENZE: Mario registra; istruttore 2 presente senza aver mai confermato
 select test.fails($$select public.set_attendance((select a1 from ids), '00000000-0000-0000-0000-0000000000a2', 'presente')$$, 'Presenza effettiva non registrabile su date future');
 select public.admin_assign((select p1 from ids), '00000000-0000-0000-0000-0000000000a2');
 select public.admin_assign((select p1 from ids), '00000000-0000-0000-0000-0000000000a3');
@@ -108,14 +81,10 @@ select test.ok(test.rows($$select 1 from public.attendance_sheet(current_date-5,
 select test.ok(test.rows($$select 1 from public.attendance_sheet(current_date, current_date+30) where display_name='Istruttore Uno' and app_response='non_ci_sono' and attendance is null$$) = 0,
   'Assegnazione rimossa non compare nel registro');
 select test.ok(test.rows($$select 1 from public.audit_log where table_name='attendance_records'$$) = 2, 'Modifiche alle presenze tracciate');
-
--- FABIO: senza permesso presenze finché Mario non lo concede
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000f', false);
 select test.fails($$select public.set_attendance((select a1 from ids), '00000000-0000-0000-0000-0000000000a2', 'assente')$$, 'Fabio: presenze bloccate finché non autorizzato');
 select test.fails($$select public.attendance_sheet(current_date, current_date+30)$$, 'Fabio: registro bloccato finché non autorizzato');
 select test.fails($$select public.admin_assign((select a2 from ids), '00000000-0000-0000-0000-00000000000f')$$, 'Fabio: NON assegna turni');
-
--- ALLENAMENTI
 create temp table w as select public.create_workout('Novembre – Settimana 1') id;
 grant select on w to authenticated;
 select public.save_workout_version((select id from w), null, 'Novembre – Settimana 1', 'Distanza totale nuoto: 1100m',
@@ -125,20 +94,16 @@ select test.fails($$select public.save_workout_version((select id from w), (sele
 insert into storage.objects(bucket_id, name) values ('workout-pdfs', 'workouts/' || (select id from w) || '/originale.pdf');
 select public.register_workout_file((select id from w), 'workouts/' || (select id from w) || '/originale.pdf', 'Allenamenti.pdf', 120000);
 select test.fails($$insert into storage.objects(bucket_id, name) values ('workout-pdfs', 'altro/x.pdf')$$, 'Storage: percorso non consentito');
-
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', false);
 select test.ok(test.rows('select 1 from public.workouts') = 0, 'Istruttore: non vede le bozze');
 select test.ok(test.rows('select 1 from public.workout_versions') = 0, 'Istruttore: non vede versioni non pubblicate');
 select test.fails($$select public.create_workout('x')$$, 'Istruttore: NON crea allenamenti');
 select test.fails($$insert into storage.objects(bucket_id, name) values ('workout-pdfs', 'workouts/' || (select id from w) || '/hack.pdf')$$, 'Istruttore: NON carica PDF');
 select test.ok(test.rows($$select 1 from storage.objects where bucket_id='workout-pdfs'$$) = 0, 'Istruttore: PDF di bozza non accessibile');
-
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000f', false);
 select test.fails($$select public.publish_workout((select id from w), (select current_version_id from public.workouts where id=(select id from w)), false)$$, 'Pubblicazione senza revisione confermata rifiutata');
 select public.publish_workout((select id from w), (select current_version_id from public.workouts where id=(select id from w)), true, false);
--- nuova bozza dopo la pubblicazione: lo staff continua a vedere la versione approvata
 select public.save_workout_version((select id from w), (select current_version_id from public.workouts where id=(select id from w)), 'Novembre – Settimana 1', 'bozza', '[]'::jsonb, null);
-
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', false);
 select test.ok(test.rows('select 1 from public.workouts') = 1, 'Istruttore: vede la scheda pubblicata');
 select test.ok(test.rows('select 1 from public.workout_versions') = 1, 'Istruttore: vede solo la versione approvata, non la bozza successiva');
@@ -149,8 +114,6 @@ set role authenticated; select set_config('request.jwt.claim.sub', '00000000-000
 select test.ok(test.rows($$select 1 from public.workout_files$$) = 0, 'Istruttore: non vede i file originali');
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000f', false);
 select test.ok(test.rows($$select 1 from storage.objects where bucket_id='workout-pdfs'$$) = 1, 'Fabio: vede il PDF originale archiviato');
-
--- REVOCA: Mario disattiva l'istruttore 1
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
 select public.admin_set_active('00000000-0000-0000-0000-0000000000a1', false);
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', false);   -- stesso token, ancora "valido"
@@ -170,22 +133,16 @@ select test.ok(test.rows($$select 1 from public.assignments where profile_id='00
 select public.admin_set_active('00000000-0000-0000-0000-0000000000a1', true);
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', false);
 select test.ok(public.whoami() is not null, 'Riattivazione: accesso ripristinato');
-
--- Presenze: solo Mario, anche se si tenta di dare il permesso a Fabio
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
 select public.admin_set_permissions('00000000-0000-0000-0000-00000000000f', false, true, true);
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000f', false);
 select test.fails($$select public.set_attendance((select p1 from ids), '00000000-0000-0000-0000-0000000000a2', 'assente')$$, 'Fabio: presenze sempre bloccate (solo Mario)');
 select test.ok((public.whoami()->>'can_manage_workouts')::boolean, 'Fabio: mantiene la gestione allenamenti');
-
--- Turni rapidi: tutti i lunedì/mercoledì/venerdì di un periodo
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
 select test.ok(public.admin_assign_weekday('00000000-0000-0000-0000-0000000000a3', current_date, current_date + 30, extract(isodow from (select date from public.activities where id=(select a2 from ids)))::int, 'allenamento') >= 4, 'Mario: assegna una persona a tutti i giorni X del periodo');
 select test.ok(public.admin_assign_weekday('00000000-0000-0000-0000-0000000000a3', current_date, current_date + 30, extract(isodow from (select date from public.activities where id=(select a2 from ids)))::int, 'allenamento') = 0, 'Assegnazione rapida: nessun doppione');
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', false);
 select test.fails($$select public.admin_assign_weekday('00000000-0000-0000-0000-0000000000a1', current_date, current_date+30, 1, 'allenamento')$$, 'Istruttore: NON usa l''assegnazione rapida');
-
--- Conservazione presenze 12 mesi
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
 select public.admin_save_activity(null, current_date - 400, 'allenamento', 'Vecchia', null, null, null, false);
 select public.set_attendance((select id from public.activities where title='Vecchia'), '00000000-0000-0000-0000-0000000000a2', 'presente');
@@ -194,7 +151,30 @@ select test.ok(test.rows($$select 1 from public.attendance_records$$) = 2, 'Puli
 select test.ok(test.rows($$select 1 from public.audit_log where table_name='attendance_records' and coalesce(new_data,old_data)->>'activity_id' = (select id::text from public.activities where title='Vecchia')$$) = 0, 'Pulizia: i dati cancellati non restano nello storico');
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', false);
 select test.fails($$select public.admin_purge_expired_attendance()$$, 'Istruttore: NON avvia la pulizia');
-
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+select public.admin_set_roles('00000000-0000-0000-0000-0000000000a2', false, false, true, false);   -- solo corsi
+select test.fails($$select public.admin_assign((select a2 from ids), '00000000-0000-0000-0000-0000000000a2')$$, 'Istruttore solo corsi: non assegnabile agli allenamenti');
+select test.fails($$select public.admin_set_roles('00000000-0000-0000-0000-0000000000a2', false, false, false, false)$$, 'Ruoli: almeno uno obbligatorio');
+create temp table ss as select public.admin_save_season(null, '2026/2027', current_date + 60, current_date + 120,
+  '[{"kind":"allenamento","isodow":2,"start":"21:00","end":"22:30"},{"kind":"corso","isodow":4,"start":"20:00","end":"21:30"}]'::jsonb) r;
+grant select on ss to authenticated;
+select test.ok(((select r from ss)->>'created')::int between 16 and 20, 'Stagione: serate generate da giorni e orari');
+select test.ok(test.rows($$select 1 from public.activities where season_id is not null and kind='corso' and extract(isodow from date)=4 and start_time='20:00'$$) between 8 and 10, 'Stagione: corsi il giorno e all''ora indicati');
+select public.admin_assign((select id from public.activities where season_id is not null and kind='corso' order by date limit 1), '00000000-0000-0000-0000-0000000000a2');
+create temp table ss2 as select public.admin_save_season((select (r->>'season_id')::uuid from ss), '2026/2027', current_date + 60, current_date + 120,
+  '[{"kind":"allenamento","isodow":3,"start":"21:00","end":"22:30"}]'::jsonb) r;
+grant select on ss2 to authenticated;
+select test.ok(((select r from ss2)->>'kept_with_staff')::int = 1 and ((select r from ss2)->>'removed')::int >= 15, 'Stagione modificata: serate tolte, quelle con istruttori conservate e segnalate');
+select test.fails($$select public.admin_save_season(null, 'x', current_date + 70, current_date + 90, '[{"kind":"corso","isodow":1,"start":"20:00","end":"21:00"}]'::jsonb)$$, 'Stagioni sovrapposte rifiutate');
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', false);
+select test.fails($$select public.admin_save_season(null, 'x', current_date + 500, current_date + 600, '[{"kind":"corso","isodow":1,"start":"20:00","end":"21:00"}]'::jsonb)$$, 'Istruttore: NON imposta la stagione');
+select test.ok(test.rows($$select 1 from public.seasons$$) = 1, 'Staff: vede la stagione');
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+select public.admin_save_activity(null, current_date + 200, 'corso', null, null, null, null, false);
+create temp table ss3 as select public.admin_save_season(null, 'Prossima', current_date + 195, current_date + 205,
+  jsonb_build_array(jsonb_build_object('kind','corso','isodow',extract(isodow from current_date + 200)::int,'start','20:00','end','21:30'))) r;
+grant select on ss3 to authenticated;
+select test.ok(((select r from ss3)->>'adopted')::int = 1 and test.rows($$select 1 from public.activities where date = current_date + 200 and kind='corso'$$) = 1, 'Stagione: serata già inserita adottata, nessun doppione');
 reset role;
 do $$ begin raise exception 'RISULTATI % ok / % falliti || %', (select count(*) filter (where ok) from test.results), (select count(*) filter (where not ok) from test.results),
   coalesce((select string_agg(name || coalesce(' ['||detail||']',''), ' | ') from test.results where not ok), 'nessun fallimento'); end $$;

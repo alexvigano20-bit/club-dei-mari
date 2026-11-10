@@ -420,6 +420,6 @@ A.seasonSave = (el) => {
   }, null, { button: el }).then((r) => {
     if (!r || r === true) return;
     closeSheet();
-    toast(`Stagione salvata: ${r.created} serate create${r.removed ? `, ${r.removed} tolte` : ''}${r.kept_with_staff ? `. ${r.kept_with_staff} serate non più previste hanno istruttori assegnati: controllale nel Calendario` : ''}`);
+    toast(`Stagione salvata: ${r.created} serate create${r.adopted ? `, ${r.adopted} già presenti aggiornate con l'orario` : ''}${r.removed ? `, ${r.removed} tolte` : ''}${r.kept_with_staff ? `. ${r.kept_with_staff} serate non più previste hanno istruttori assegnati: controllale nel Calendario` : ''}`);
   });
 };
