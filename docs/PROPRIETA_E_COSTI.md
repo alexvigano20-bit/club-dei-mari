@@ -60,10 +60,13 @@ Conclusione: **0 €/anno** è sufficiente. Il dominio è l'unica spesa che dare
 - [ ] Migrazioni `supabase/migrations/` e funzione `admin-users` applicate al nuovo progetto; `web/js/config.js` aggiornato; primo responsabile creato per Mario (`private.bootstrap_admin`).
 - [ ] Progetto di prova eliminato dall'organizzazione di Alessandro.
 - [ ] Con info@: account GitHub creato e organizzazione gratuita del club creata; repository trasferito lì (Settings → Transfer); Alessandro collaboratore con scrittura.
-- [ ] Aggiornato l'indirizzo dell'app se cambia (prima dell'installazione da parte dello staff).
+- [ ] Nel progetto definitivo: **Authentication → Sign In / Providers → Email → disattivare «Allow new users to sign up»** (gli account li crea solo Mario dall'app).
+- [ ] `web/js/config.js` con indirizzo e chiave pubblica del progetto definitivo; `environment: 'produzione'`; `VERSION` di `web/sw.js` aumentata; workflow `keepalive.yml` aggiornato al nuovo progetto.
+- [ ] Ripetuti sul progetto definitivo i controlli di sicurezza (`tests/rls_test_supabase.sql`, tutto annullato a fine prova).
+- [ ] **Nuovo link definitivo** verificato (login, creazione di un account, stagione) e consegnato a Mario: è quello da mandare a tutto lo staff. Il link di prova non va più usato.
 - [ ] Nell'app Mario è «Responsabile». Alessandro rimane istruttore o viene disattivato, come Mario preferisce.
 - [ ] Mario sa fare l'esportazione mensile dei dati (Gestione Club → «Esporta tutti i dati»).
 - [ ] Consegnati a Mario lo ZIP del codice, questo documento, `BACKUP_E_MANUTENZIONE.md` e `GUIDA_MARIO.md`.
-- [ ] Chi riceve le email di Supabase (avvisi di sospensione o limiti) le legge: arrivano al Gmail del club.
+- [ ] Chi riceve le email di Supabase (avvisi di sospensione o limiti) le legge: arrivano a info@clubdeimari.com.
 
 Per la manutenzione tecnica straordinaria (aggiornamenti, ripristino) Mario potrà incaricare chiunque: tutto è documentato e senza componenti proprietari.
