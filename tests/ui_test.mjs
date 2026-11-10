@@ -42,7 +42,7 @@ try {
   await i1.page.waitForSelector('.error'); ok(await i1.page.isVisible('text=Email o password non corretti'), 'Login: password errata rifiutata con messaggio chiaro');
   await i1.page.fill('#password', PW); await i1.page.click('button[type=submit]');
   await i1.page.waitForSelector('.tour'); await shot(i1, '02-guida'); ok(true, 'Guida mostrata al primo accesso');
-  ok(await i1.page.isVisible('text=PASSO 1 DI 6'), 'Guida istruttore: 6 passi (niente Pianifica/Gestione/Caricare allenamenti)');
+  ok(await i1.page.isVisible('text=PASSO 1 DI 7'), 'Guida istruttore: 7 passi (niente Pianifica/Gestione/Caricare allenamenti)');
   await i1.page.click('text=Salta la guida'); await i1.page.waitForSelector('.hero'); await shot(i1, '03-home-istruttore');
   ok(!(await i1.page.isVisible('text=Gestione Club')), 'Istruttore: Gestione Club non visibile');
   ok(await i1.page.isVisible('.bottomnav button:has-text("I miei turni")') && await i1.page.isVisible('.bottomnav button:has-text("Comunicazioni")'), 'Quattro tasti fissi in basso');
@@ -90,7 +90,7 @@ try {
   // ---------- 3. Fabio: PDF → bozze → revisione → pubblicazione ----------
   const fabio = await device('fabio-iphone', 'iPhone 13');
   await fabio.page.goto(APP); await fabio.page.fill('#email', 'fabio@prova.invalid'); await fabio.page.fill('#password', PW); await fabio.page.click('button[type=submit]');
-  await fabio.page.waitForSelector('.tour'); ok(await fabio.page.isVisible('text=PASSO 1 DI 7'), 'Guida Fabio: 7 passi (con «Caricare un allenamento», senza Gestione)');
+  await fabio.page.waitForSelector('.tour'); ok(await fabio.page.isVisible('text=PASSO 1 DI 8'), 'Guida Fabio: 8 passi (con «Caricare un allenamento», senza Gestione)');
   await fabio.page.click('text=Salta la guida');
   ok(!(await fabio.page.isVisible('text=Gestione Club')), 'Fabio: niente Gestione Club');
   await nav(fabio, 'Allenamenti'); await fabio.page.waitForSelector('text=Carica PDF'); await shot(fabio, '11-allenamenti-fabio');

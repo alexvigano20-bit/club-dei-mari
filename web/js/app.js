@@ -61,8 +61,8 @@ function chrome(show) {
 
 function renderLogin(message = '') {
   chrome(false);
-  $('greeting').textContent = 'Club dei Mari';
-  $('subtitle').textContent = 'Area riservata allo staff';
+  $('greeting').textContent = 'Area staff';
+  $('subtitle').textContent = 'Accedi con le credenziali ricevute da Mario';
   $('main').innerHTML = `
     <form class="card login" id="loginForm" autocomplete="on">
       <h2>Accedi</h2>
@@ -386,6 +386,7 @@ const tourSteps = () => [
   ...(isAdmin() ? [['Pianifica turni', 'Dalla pagina iniziale apri «Pianifica turni». La prima volta imposti la stagione: da che giorno a che giorno, in che giorni e a che ora ci sono allenamenti e corsi. Poi, mese per mese, assegni chi segue ogni serata, anche «a tutti i mercoledì» con un tocco.'], ['Gestione Club', 'Staff e accessi, sostituzioni, registro presenze, esportazioni.']] : []),
   ...(canWorkouts() ? [['Caricare un allenamento', 'In «Allenamenti» tocca «Carica PDF». L\'app propone le schede: confrontale con l\'originale, correggi e solo dopo tocca «Approva e pubblica».']] : []),
   ['Stampa', 'In Turni, Calendario e Allenamenti trovi «Stampa / Salva PDF»: sul telefono scegli «Salva come PDF» nel menu di stampa.'],
+  ['Privacy', 'L\'app conserva solo nome, email, turni, risposte e presenze. Gli altri vedono nome, turni e sostituzioni da organizzare; email, risposte e presenze di tutti solo il responsabile. Dati su server UE; presenze cancellate dopo 12 mesi. Per vedere, correggere o cancellare i tuoi dati: info@clubdeimari.com.'],
 ];
 let tourStep = 0;
 function renderTour(main) {
@@ -423,6 +424,9 @@ function wireEvents() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) recheck(); });
   setInterval(recheck, 5 * 60 * 1000);
 }
+
+// La schermata d'apertura sparisce da sola (CSS); dopo la togliamo dalla pagina
+setTimeout(() => document.getElementById('splash')?.remove(), 1700);
 
 function registerSW() {
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {

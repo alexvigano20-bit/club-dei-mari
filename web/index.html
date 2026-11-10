@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#073e59">
+  <meta name="theme-color" content="#ffffff">
   <meta name="description" content="Turni, calendario, allenamenti e comunicazioni dello staff del Club dei Mari">
   <meta name="robots" content="noindex, nofollow">
   <meta name="referrer" content="no-referrer">
@@ -14,19 +14,22 @@
   <meta name="apple-mobile-web-app-title" content="Club dei Mari">
   <title>Club dei Mari · Staff</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="icon" type="image/png" href="./icons/icon-192.png">
-  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="icon" type="image/png" href="./icons/favicon-48.png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="preload" as="image" href="./img/logo-tondo.webp">
   <link rel="stylesheet" href="./css/app.css">
 </head>
 <body>
+  <!-- Schermata d'apertura: logo del club a tutto schermo su bianco per ~1 secondo -->
+  <div id="splash" class="splash" aria-hidden="true"><img src="./img/logo-tondo.webp" alt=""></div>
   <div class="app" id="app">
     <header class="top" id="top">
       <div class="headrow">
-        <div class="brand">🌊 CLUB DEI MARI</div>
+        <img class="wordmark" src="./img/scritta.webp" alt="Club dei Mari A.S.D. · Scuola di apnea" width="1100" height="251">
         <button class="guide" id="guideBtn" type="button" aria-label="Apri la guida">ⓘ Guida</button>
       </div>
-      <h1 id="greeting">Club dei Mari</h1>
-      <p id="subtitle">Turni e allenamenti, senza complicazioni.</p>
+      <div class="hello"><h1 id="greeting">Club dei Mari</h1>
+      <p id="subtitle">Turni e allenamenti, senza complicazioni.</p></div>
     </header>
     <div id="banner" class="banner hidden" role="status" aria-live="polite"></div>
     <main id="main" tabindex="-1"><p class="muted center">Caricamento…</p></main>
