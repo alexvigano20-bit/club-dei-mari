@@ -91,11 +91,11 @@ export function renderAdmin(main) {
   main.innerHTML = `<h2>Gestione Club</h2>
     <p class="muted">Area riservata al responsabile. Ogni modifica è registrata nello storico.</p>
 
-    <div class="card"><h3>🔔 Sostituzioni da gestire (${reqs.length})</h3>
+    <div class="card"><h3>Sostituzioni da gestire (${reqs.length})</h3>
       ${reqs.length ? reqs.map((r) => `<div class="item"><b>${esc(human(r.date))}</b> · ${esc(staffName(r.requested_by))}<br>${replacementForm(r)}</div>`).join('') : '<p class="muted">Nessuna richiesta aperta.</p>'}</div>
 
-    <div class="card"><h3>📅 Calendario</h3>
-      <button style="width:100%" data-act="go" data-view="plan">📋 Pianifica i turni del mese</button>
+    <div class="card"><h3>Calendario</h3>
+      <button style="width:100%" data-act="go" data-view="plan">Pianifica i turni del mese</button>
       <p class="muted">Oppure tocca un giorno nel <a href="#calendar" data-act="go" data-view="calendar">Calendario</a> per orari, note o per annullare una serata.</p>
       <details><summary>Crea serate ricorrenti (es. lun/mer/ven)</summary>
         <div class="row"><div style="flex:1"><label>Dal</label><input type="date" id="serFrom"></div><div style="flex:1"><label>Al</label><input type="date" id="serTo"></div></div>
@@ -107,7 +107,7 @@ export function renderAdmin(main) {
         <button style="width:100%" data-act="series">Crea le serate</button>
         <p class="small">Le serate già presenti non vengono duplicate. Le assegnazioni restano da fare.</p></details></div>
 
-    <div class="card"><h3>👥 Staff e accessi</h3>
+    <div class="card"><h3>Staff e accessi</h3>
       ${G.created ? `<div class="success"><b>Account creato per ${esc(G.created.name)}.</b><br>Comunica di persona o su WhatsApp:<br>indirizzo dell'app, email <b>${esc(G.created.email)}</b> e password temporanea <b>${esc(G.created.pw)}</b>. Al primo accesso sceglierà la sua.
         <div class="row"><a class="btn alt" target="_blank" rel="noopener noreferrer" href="https://wa.me/?text=${encodeURIComponent(`Ciao ${G.created.name}, ecco l'accesso all'app dello staff Club dei Mari: ${location.origin + location.pathname}\nEmail: ${G.created.email}\nPassword temporanea: ${G.created.pw}\nAl primo accesso ti chiederà di sceglierne una tua.`)}">Invia su WhatsApp</a><button class="ghost" data-act="clearCreated">Ok, fatto</button></div></div>` : ''}
       ${staff.map((p) => `<div class="checkline"><span class="who"><b>${esc(p.display_name)}</b>${p.active ? '' : ' <span class="pill grey">disattivato</span>'}<br>
@@ -122,12 +122,12 @@ export function renderAdmin(main) {
         <button style="width:100%" data-act="staffCreate">Crea accesso</button>
         <p class="small">L'account non viene inviato automaticamente: decidi tu quando comunicarlo.</p></details></div>
 
-    <div class="card"><h3>📝 Presenze effettive</h3><p class="muted">Registro separato dalle conferme in app: stampa il foglio da spuntare in piscina e poi riporta le presenze.</p>
+    <div class="card"><h3>Presenze effettive</h3><p class="muted">Registro separato dalle conferme in app: stampa il foglio da spuntare in piscina e poi riporta le presenze.</p>
       <button style="width:100%" data-act="go" data-view="attendance">Apri il registro presenze</button>
       <p class="small">Le presenze vengono conservate 12 mesi e poi cancellate automaticamente ogni notte. Prima, se ti servono, esporta il CSV.</p>
       <button class="ghost sm" data-act="purgeAttendance">Cancella ora le presenze oltre 12 mesi</button></div>
 
-    <div class="card"><h3>💾 Dati e sicurezza</h3>
+    <div class="card"><h3>Dati e sicurezza</h3>
       <button class="alt" style="width:100%" data-act="exportAll">↓ Esporta tutti i dati (copia di sicurezza)</button>
       <p class="small">File JSON completo (staff, calendario, turni, risposte, sostituzioni, presenze, allenamenti, storico). I PDF originali restano nell'archivio privato: vedi la procedura di backup.</p>
       <details><summary>Ultime modifiche registrate</summary><div class="audit">${(G.adminData.audit || []).map(auditLine).join('') || '<p class="muted">Nessuna.</p>'}</div></details>
@@ -229,7 +229,7 @@ export function renderAttendance(main) {
   main.innerHTML = `<h2>Registro presenze</h2>
     <div class="alert small">Le presenze effettive sono diverse dalle conferme in app. «Da verificare» significa che nessuno ha ancora registrato la presenza: non è un'assenza. Conservazione: 12 mesi.</div>
     <label for="attMonth">Mese</label><input type="month" id="attMonth" value="${G.month}" data-change="attMonth">
-    <div class="row"><button data-act="printRegister">🖨️ Stampa foglio da spuntare</button><button class="alt" data-act="printVerified">🖨️ Stampa riepilogo</button><button class="alt" data-act="attCsv">↓ CSV per Excel</button></div>
+    <div class="row"><button data-act="printRegister">Stampa foglio da spuntare</button><button class="alt" data-act="printVerified">Stampa riepilogo</button><button class="alt" data-act="attCsv">↓ CSV per Excel</button></div>
     ${!rows ? '<p class="muted">Caricamento…</p>' : ordered.length ? ordered.map((g) => `<div class="card"><h3>${esc(humanShort(g.date))} · ${esc(KIND[g.kind])}${g.title ? ' · ' + esc(g.title) : ''}${g.activity_status === 'annullata' ? ' <span class="pill red">annullata</span>' : ''}</h3>
       ${g.people.map((p) => `<div class="checkline"><span class="who"><b>${esc(p.display_name)}</b>${p.assigned ? '' : ' <span class="pill gold">non assegnato</span>'}<br>
         <span class="small">Conferma app: ${p.app_response === 'ci_sono' ? 'Ci sono' : p.app_response === 'non_ci_sono' ? 'Non ci sono' : 'nessuna'}${p.recorded_at ? ` · registrata da ${esc(p.recorded_by_name)} il ${esc(dt(p.recorded_at))}` : ''}</span></span>
@@ -327,14 +327,14 @@ export function renderPlan(main) {
       <p class="small">Es. «Aldo a tutti i mercoledì»: chi è già assegnato non viene duplicato; le serate annullate sono saltate.</p></div>
     <div class="card"><h3>Turni nel mese per persona</h3><div class="row" style="gap:6px">${staff.map((p) => `<span class="pill ${count.get(p.id) ? '' : 'grey'}">${esc(p.display_name)} · ${count.get(p.id) || 0}</span>`).join('')}</div></div>
     ${availSummaryHtml(P.month, staff)}
-    <div class="row"><button class="alt" data-act="planPrint">🖨️ Stampa il piano del mese</button></div>
+    <div class="row"><button class="alt" data-act="planPrint">Stampa il piano del mese</button></div>
     ${acts.map((a) => { const assigned = new Set(a.assignments.map((s) => s.profile_id)); return `<div class="card ${a.status === 'annullata' ? 'soft' : ''}" style="padding:12px">
       <b>${esc(humanShort(a.date))}</b> · ${esc(KIND[a.kind])}${a.start_time ? ' · ' + hhmm(a.start_time) : ''}${a.title ? ' · ' + esc(a.title) : ''}${a.status === 'annullata' ? ' <span class="pill red">annullata</span>' : ''}${a.provisional ? ' <span class="pill gold">da verificare</span>' : ''}
       <div class="row" style="gap:6px;margin:8px 0">${a.assignments.map((s) => { const r = S.data.responses?.[s.id];
-        return `<button class="alt sm" data-act="planRemove" data-id="${s.id}" data-name="${esc(staffName(s.profile_id))}" aria-label="Togli ${esc(staffName(s.profile_id))}">${r === 'ci_sono' ? '✓ ' : r === 'non_ci_sono' ? '⚠ ' : ''}${esc(staffName(s.profile_id))} ✕</button>`; }).join('') || '<span class="small">nessuno assegnato</span>'}</div>
+        return `<button class="alt sm" data-act="planRemove" data-id="${s.id}" data-name="${esc(staffName(s.profile_id))}" aria-label="Togli ${esc(staffName(s.profile_id))}">${r === 'ci_sono' ? '✓ ' : r === 'non_ci_sono' ? '⚠︎ ' : ''}${esc(staffName(s.profile_id))} ✕</button>`; }).join('') || '<span class="small">nessuno assegnato</span>'}</div>
       ${a.status === 'attiva' ? `<select data-change="planAdd" data-a="${a.id}" aria-label="Aggiungi istruttore" style="margin:0"><option value="">＋ aggiungi…</option>${addOptions(a, staff.filter((p) => !assigned.has(p.id) && canTeach(p, a.kind)))}</select>` : ''}
     </div>`; }).join('')}`}
-    <p class="small">✓ ha confermato · ⚠ ha detto «Non ci sono». Per orari, note o annullare una serata tocca il giorno nel Calendario.</p>
+    <p class="small">✓ ha confermato · ⚠︎ ha detto «Non ci sono». Per orari, note o annullare una serata tocca il giorno nel Calendario.</p>
     ${back}`;
 }
 

@@ -187,3 +187,9 @@ summary{cursor:pointer;font-weight:700;padding:8px 0}
   .print-area .day .dot{font-size:7.5pt}
   .print-area .pagebreak{break-before:page}
 }
+
+/* Icone del club (SVG) */
+.ico{display:inline-flex;align-items:center;justify-content:center}
+.ico svg{display:block;width:100%;height:100%}
+.tile .ico{width:52px;height:52px}
+.bottomnav button .ico{width:30px;height:30px}

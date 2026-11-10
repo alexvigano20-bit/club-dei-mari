@@ -30,7 +30,7 @@ function listView(main) {
     ${canWorkouts() ? `<div class="card soft"><span class="pill">SOLO FABIO E MARIO</span>
       <h3>Carica il PDF dell'allenamento</h3>
       <p class="muted">Continua a scrivere come preferisci. L'app legge il PDF, propone la scheda e tu la confronti con l'originale. Nulla viene pubblicato senza la tua approvazione.</p>
-      <label class="btn" for="pdfInput" style="width:100%;font-size:18px">📄 Carica PDF</label>
+      <label class="btn" for="pdfInput" style="width:100%;font-size:18px">Carica PDF</label>
       <input id="pdfInput" type="file" accept="application/pdf,.pdf" class="hidden" data-change="pdfPicked">
       <button class="ghost" style="width:100%" data-act="newBlank">oppure crea una scheda scrivendo il testo</button></div>` : ''}
     <h3>Schede pubblicate</h3>
@@ -54,7 +54,7 @@ function readView(main) {
   main.innerHTML = `<button class="ghost" data-act="wList">← Tutti gli allenamenti</button>
     <div class="card"><span class="pill green">SCHEDA APPROVATA</span><h2>${esc(v.title)}</h2>${blocksHtml(v)}
       <p class="small">Scheda di consultazione approvata da ${esc(w.published_by || 'Fabio/Mario')} il ${esc(dt(w.published_at))}. Attenersi alle indicazioni tecniche e alle procedure di sicurezza stabilite dagli istruttori.</p></div>
-    <div class="row"><button data-act="wPrint" data-id="${w.id}">🖨️ Stampa / Salva PDF</button>
+    <div class="row"><button data-act="wPrint" data-id="${w.id}">Stampa / Salva PDF</button>
       </div>
     ${canWorkouts() ? `<div class="row" style="margin-top:8px"><button class="alt" data-act="wReview" data-id="${w.id}">✎ Modifica (nuova bozza)</button>
       <button class="warn" data-act="wUnpublish" data-id="${w.id}">Ritira pubblicazione</button></div>` : ''}`;
@@ -129,7 +129,7 @@ function uploadView(main) {
     ${u.items ? u.items.map((x, i) => {
       const chk = x.scanned ? null : integrity(x.source_text, x);
       return `<div class="item"><label class="check"><input type="checkbox" data-change="upPick" data-i="${i}" ${x.pick ? 'checked' : ''}> <span><b>${esc(x.title)}</b><br>
-        <span class="small">${x.blocks.length} blocchi proposti · ${x.blocks.filter((b) => b.uncertain).length} da verificare${chk ? (chk.ok ? ' · ✓ tutte le parole e i numeri del PDF sono presenti' : ' · ⚠ differenze da controllare') : ''}</span></span></label></div>`;
+        <span class="small">${x.blocks.length} blocchi proposti · ${x.blocks.filter((b) => b.uncertain).length} da verificare${chk ? (chk.ok ? ' · ✓ tutte le parole e i numeri del PDF sono presenti' : ' · ⚠︎ differenze da controllare') : ''}</span></span></label></div>`;
     }).join('') + `<button style="width:100%;margin-top:10px" data-act="upCreate">Crea le bozze e archivia il PDF originale</button>
       <p class="small">Il PDF originale viene conservato in un archivio privato, visibile solo a Fabio e Mario. Le bozze non sono visibili allo staff.</p>` : '<p class="muted">Attendere…</p>'}</div>`;
 }
@@ -196,7 +196,7 @@ function reviewView(main) {
   const unresolved = e.blocks.filter((b) => b.uncertain).length;
   const file = d.files?.[0];
   const sourcePanel = `<section><h3>Originale</h3>
-      ${file ? `<button class="alt" style="width:100%" data-act="wOriginal" data-path="${esc(file.storage_path)}">📄 Apri il PDF originale</button>` : '<p class="small">Nessun PDF allegato.</p>'}
+      ${file ? `<button class="alt" style="width:100%" data-act="wOriginal" data-path="${esc(file.storage_path)}">Apri il PDF originale</button>` : '<p class="small">Nessun PDF allegato.</p>'}
       <p class="small">Testo estratto dal PDF, riga per riga, senza modifiche:</p>
       <div class="source">${esc(e.source_text || '(nessun testo estratto)')}</div>
       <details><summary>Correggi o incolla il testo originale</summary><textarea id="srcEdit" rows="10">${esc(e.source_text)}</textarea>
@@ -208,11 +208,11 @@ function reviewView(main) {
       ${e.blocks.map((b, i) => `<div class="blockedit ${b.uncertain ? 'uncertain' : ''}">
         <div class="row" style="justify-content:space-between;align-items:center"><b>Blocco ${i + 1}</b>
           <span><button class="ghost sm" data-act="bUp" data-i="${i}" aria-label="Sposta su" ${i ? '' : 'disabled'}>↑</button><button class="ghost sm" data-act="bDown" data-i="${i}" aria-label="Sposta giù" ${i < e.blocks.length - 1 ? '' : 'disabled'}>↓</button>
-          <button class="ghost sm" data-act="bDel" data-i="${i}" aria-label="Elimina blocco">🗑</button></span></div>
-        ${b.uncertain ? `<div class="alert small">⚠ ${esc(b.note || 'Passaggio da verificare')}<br><button class="ok sm" data-act="bOk" data-i="${i}">Ho verificato questo blocco</button></div>` : ''}
+          <button class="ghost sm" data-act="bDel" data-i="${i}" aria-label="Elimina blocco">Elimina</button></span></div>
+        ${b.uncertain ? `<div class="alert small">⚠︎ ${esc(b.note || 'Passaggio da verificare')}<br><button class="ok sm" data-act="bOk" data-i="${i}">Ho verificato questo blocco</button></div>` : ''}
         <label>Titolo / indicazione</label><input value="${esc(b.title)}" data-change="bTitle" data-i="${i}" maxlength="200">
         <label>Esercizi (una riga per esercizio)</label><textarea data-change="bBody" data-i="${i}">${esc(b.body || '')}</textarea>
-        <button class="ghost sm" data-act="bFlag" data-i="${i}">${b.uncertain ? '' : '⚑ Segna come da verificare'}</button></div>`).join('')}
+        <button class="ghost sm" data-act="bFlag" data-i="${i}">${b.uncertain ? '' : '⚑︎ Segna come da verificare'}</button></div>`).join('')}
       <button class="alt" style="width:100%" data-act="bAdd">＋ Aggiungi blocco</button>
       <div id="integ">${integrityHtml()}</div>
       <h3>Anteprima per lo staff</h3><div class="card" id="wPreview">${blocksHtml(e)}</div>
@@ -226,7 +226,7 @@ function reviewView(main) {
     <div class="tabs" role="tablist"><button class="${W.tab === 'originale' ? 'active' : 'alt'}" data-act="tab" data-t="originale">Originale</button><button class="${W.tab === 'scheda' ? 'active' : 'alt'}" data-act="tab" data-t="scheda">Scheda</button></div>
     <div class="review" id="reviewGrid">${matchMedia('(min-width:900px)').matches ? sourcePanel + editPanel : (W.tab === 'originale' ? sourcePanel : editPanel)}</div>
     <div class="card"><h3>Salva e pubblica</h3>
-      <button style="width:100%" id="saveBtn" data-act="wSave" ${W.dirty ? '' : 'disabled'}>💾 Salva bozza (nuova versione)</button>
+      <button style="width:100%" id="saveBtn" data-act="wSave" ${W.dirty ? '' : 'disabled'}>Salva bozza (nuova versione)</button>
       <label class="check"><input type="checkbox" id="pubCheck"> <span>Ho confrontato la scheda con il PDF originale: distanze, tempi, recuperi, ordine e indicazioni di sicurezza sono corretti.</span></label>
       <p class="small">Lo staff vede solo la scheda approvata. Il PDF originale resta archiviato per Fabio e Mario.</p>
       ${unresolved ? `<div class="alert">Ci sono ${unresolved} blocchi da verificare: risolvili prima di pubblicare.</div>` : ''}

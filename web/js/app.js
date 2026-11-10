@@ -7,6 +7,7 @@ import {
   myAssignments, responseOf, openRequests, printHtml, printHeader, openSheet, closeSheet, sheetOpen, defaultRange,
 } from './core.js';
 import { renderWork } from './workouts.js';
+import { iconMine, iconWork, iconCal, iconNotices, NAV_ICONS } from './icons.js';
 import { renderAvail, homeAvailBanner } from './availability.js';
 import { renderAdmin, renderAttendance, renderPlan, dayAdminHtml, replacementForm } from './admin.js';
 
@@ -177,10 +178,10 @@ function renderHome(main) {
   const drafts = (S.workouts || []).filter((w) => w.status === 'bozza').length;
   main.innerHTML = `
     <div class="hero">
-      <button class="tile" data-act="go" data-view="mine"><span>🙋</span>I miei turni</button>
-      <button class="tile" data-act="go" data-view="work"><span>🏊</span>Allenamenti${canWorkouts() && drafts ? `<span class="count">${drafts} bozza/e</span>` : ''}</button>
-      <button class="tile" data-act="go" data-view="calendar"><span>📅</span>Calendario</button>
-      <button class="tile" data-act="go" data-view="notices"><span>🔔</span>Comunicazioni${open ? `<span class="count">${open} sostituzione/i</span>` : ''}</button>
+      <button class="tile" data-act="go" data-view="mine"><span class="ico">${iconMine()}</span>I miei turni</button>
+      <button class="tile" data-act="go" data-view="work"><span class="ico">${iconWork()}</span>Allenamenti${canWorkouts() && drafts ? `<span class="count">${drafts} bozza/e</span>` : ''}</button>
+      <button class="tile" data-act="go" data-view="calendar"><span class="ico">${iconCal()}</span>Calendario</button>
+      <button class="tile" data-act="go" data-view="notices"><span class="ico">${iconNotices()}</span>Comunicazioni${open ? `<span class="count">${open} sostituzione/i</span>` : ''}</button>
     </div>
     ${homeAvailBanner()}
     <div class="card"><h3>Il tuo prossimo turno</h3>
@@ -190,8 +191,8 @@ function renderHome(main) {
         ${respStatus(s.id)}</div>`).join('') : '<p class="muted">Nessun turno in programma.</p>'}
     </div>
     <div class="rolebar">
-      ${isAdmin() ? '<button data-act="go" data-view="plan">📋 Pianifica turni</button><button class="alt" data-act="go" data-view="admin">⚙ Gestione Club</button>' : ''}
-      ${canAttendance() ? '<button class="alt" data-act="go" data-view="attendance">📝 Registro presenze</button>' : ''}
+      ${isAdmin() ? '<button data-act="go" data-view="plan">Pianifica turni</button><button class="alt" data-act="go" data-view="admin">Gestione Club</button>' : ''}
+      ${canAttendance() ? '<button class="alt" data-act="go" data-view="attendance">Registro presenze</button>' : ''}
       ${canWorkouts() ? '<button class="alt" data-act="go" data-view="work">✎ Carica o rivedi un allenamento</button>' : ''}
       <button class="ghost" data-act="password">Cambia password</button>
       <button class="ghost" data-act="logout">Esci da questo telefono</button>
@@ -232,7 +233,7 @@ function renderMine(main) {
   const past = all.filter((x) => x.activity.date < t).reverse();
   main.innerHTML = `<h2>I miei turni</h2>
     <button class="alt" style="width:100%;margin-bottom:8px" data-act="availOpen">Le mie disponibilità (mese per mese)</button>
-    <div class="row"><button data-act="printMine">🖨️ Stampa / Salva PDF</button></div>
+    <div class="row"><button data-act="printMine">Stampa / Salva PDF</button></div>
     <p class="muted">Turni assegnati da Mario. Rispondi «Ci sono» o «Non ci sono»: se non puoi, Mario organizza la sostituzione.</p>
     ${next.length ? next.map((x) => shiftCard(x, true)).join('') : '<div class="card">Nessun turno in programma.</div>'}
     ${past.length ? `<details><summary>Turni passati (${past.length})</summary>${past.map((x) => shiftCard(x, false)).join('')}</details>` : ''}
@@ -291,7 +292,7 @@ function renderCalendar(main) {
   const map = byDate(); const t = todayISO(); const nowKey = t.slice(0, 7);
   const minLoaded = S.range.from.slice(0, 7);
   main.innerHTML = `<h2>Calendario staff</h2>
-    <div class="row"><button data-act="printCal">🖨️ Stampa / Salva PDF</button></div>
+    <div class="row"><button data-act="printCal">Stampa / Salva PDF</button></div>
     <div class="legend"><span><i class="l-mine"></i>I tuoi turni</span><span><i class="l-has"></i>Attività staff</span><span><i class="l-course"></i>Corso</span></div>
     <p class="muted">Scorri verso l'alto per i mesi successivi. Tocca un giorno per vedere attività e persone assegnate.</p>
     <div class="calbar"><button class="alt sm" data-act="calPrev">↑ Mesi precedenti</button><button class="sm" data-act="calToday">Oggi</button></div>
@@ -348,7 +349,7 @@ function renderNotices(main) {
   const ann = S.data.announcements || [];
   main.innerHTML = `<h2>Bacheca</h2>
     <p class="muted">Avvisi utili da tenere a portata di mano. Le comunicazioni di tutti i giorni restano su WhatsApp.</p>
-    ${ann.length ? ann.map((n) => `<div class="card"><h3>📌 ${esc(n.title)}</h3><p style="white-space:pre-line">${esc(n.body)}</p><p class="small">${esc(dt(n.created_at))}</p>
+    ${ann.length ? ann.map((n) => `<div class="card"><h3>${esc(n.title)}</h3><p style="white-space:pre-line">${esc(n.body)}</p><p class="small">${esc(dt(n.created_at))}</p>
        ${isAdmin() ? `<button class="ghost sm" data-act="annArchive" data-id="${n.id}">Togli dalla bacheca</button>` : ''}</div>`).join('') : '<div class="card muted">Nessun avviso in bacheca.</div>'}
     ${isAdmin() ? `<details class="card"><summary>＋ Aggiungi un avviso</summary>
       <label for="annTitle">Titolo</label><input id="annTitle" maxlength="120" placeholder="es. Piscina chiusa il 8 dicembre">
@@ -414,6 +415,7 @@ A.logout = async () => {
 };
 
 function wireEvents() {
+  document.querySelectorAll('.bottomnav button').forEach((b) => { const s = b.querySelector('span'); if (s && NAV_ICONS[b.dataset.view]) { s.className = 'ico'; s.innerHTML = NAV_ICONS[b.dataset.view](); } });
   document.addEventListener('click', (e) => {
     const c = e.target.closest('[data-close]'); if (c) { closeSheet(); return; }
     const el = e.target.closest('[data-act]'); if (!el) return;
