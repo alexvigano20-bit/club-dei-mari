@@ -383,7 +383,7 @@ const tourSteps = () => [
   ['Conferma e presenza sono diverse', 'Rispondere nell\'app non è la presenza ufficiale, e non rispondere non vuol dire essere assenti. Il registro cartaceo in piscina resta valido.'],
   ['Sostituzioni', '«Non ci sono» invia una richiesta a Mario, che sceglie il sostituto (anche concordandolo su WhatsApp).'],
   ['Allenamenti', 'Le schede pubblicate da Fabio e Mario si leggono, si stampano e si salvano in PDF. I contenuti tecnici non vanno modificati.'],
-  ...(isAdmin() ? [['Pianifica turni', 'Dalla pagina iniziale apri «Pianifica turni»: vedi tutte le serate del mese, aggiungi o togli persone con un tocco, oppure assegna una persona a tutti i lunedì (o mercoledì…) del mese.'], ['Gestione Club', 'Staff e accessi, sostituzioni, registro presenze, esportazioni.']] : []),
+  ...(isAdmin() ? [['Pianifica turni', 'Dalla pagina iniziale apri «Pianifica turni». La prima volta imposti la stagione: da che giorno a che giorno, in che giorni e a che ora ci sono allenamenti e corsi. Poi, mese per mese, assegni chi segue ogni serata, anche «a tutti i mercoledì» con un tocco.'], ['Gestione Club', 'Staff e accessi, sostituzioni, registro presenze, esportazioni.']] : []),
   ...(canWorkouts() ? [['Caricare un allenamento', 'In «Allenamenti» tocca «Carica PDF». L\'app propone le schede: confrontale con l\'originale, correggi e solo dopo tocca «Approva e pubblica».']] : []),
   ['Stampa', 'In Turni, Calendario e Allenamenti trovi «Stampa / Salva PDF»: sul telefono scegli «Salva come PDF» nel menu di stampa.'],
 ];

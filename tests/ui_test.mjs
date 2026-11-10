@@ -42,6 +42,7 @@ try {
   await i1.page.waitForSelector('.error'); ok(await i1.page.isVisible('text=Email o password non corretti'), 'Login: password errata rifiutata con messaggio chiaro');
   await i1.page.fill('#password', PW); await i1.page.click('button[type=submit]');
   await i1.page.waitForSelector('.tour'); await shot(i1, '02-guida'); ok(true, 'Guida mostrata al primo accesso');
+  ok(await i1.page.isVisible('text=PASSO 1 DI 6'), 'Guida istruttore: 6 passi (niente Pianifica/Gestione/Caricare allenamenti)');
   await i1.page.click('text=Salta la guida'); await i1.page.waitForSelector('.hero'); await shot(i1, '03-home-istruttore');
   ok(!(await i1.page.isVisible('text=Gestione Club')), 'Istruttore: Gestione Club non visibile');
   ok(await i1.page.isVisible('.bottomnav button:has-text("I miei turni")') && await i1.page.isVisible('.bottomnav button:has-text("Comunicazioni")'), 'Quattro tasti fissi in basso');
@@ -88,7 +89,9 @@ try {
 
   // ---------- 3. Fabio: PDF → bozze → revisione → pubblicazione ----------
   const fabio = await device('fabio-iphone', 'iPhone 13');
-  await login(fabio, 'fabio@prova.invalid');
+  await fabio.page.goto(APP); await fabio.page.fill('#email', 'fabio@prova.invalid'); await fabio.page.fill('#password', PW); await fabio.page.click('button[type=submit]');
+  await fabio.page.waitForSelector('.tour'); ok(await fabio.page.isVisible('text=PASSO 1 DI 7'), 'Guida Fabio: 7 passi (con «Caricare un allenamento», senza Gestione)');
+  await fabio.page.click('text=Salta la guida');
   ok(!(await fabio.page.isVisible('text=Gestione Club')), 'Fabio: niente Gestione Club');
   await nav(fabio, 'Allenamenti'); await fabio.page.waitForSelector('text=Carica PDF'); await shot(fabio, '11-allenamenti-fabio');
   await fabio.page.setInputFiles('#pdfInput', PDF);
@@ -144,6 +147,20 @@ try {
   await mario.page.locator('select[data-change="planAdd"]').first().selectOption({ label: 'Istruttore Prova Due' }); await mario.page.waitForSelector('#toast:has-text("Assegnato")');
   ok(true, 'Pianifica turni: aggiunta con un tocco');
   await shot(mario, '22-pianifica-turni');
+  // Stagione: giorni e orari di allenamenti e corsi
+  await mario.page.click('[data-act="seasonEdit"]'); await mario.page.waitForSelector('#sheet >> text=Quando ci sono gli allenamenti?');
+  await mario.page.locator('.s-allenamento[value="2"]').check(); await mario.page.locator('.s-corso[value="4"]').check();
+  await mario.page.fill('#s-corso-start', '19:30'); await mario.page.fill('#s-corso-end', '21:00');
+  await shot(mario, '23-stagione');
+  await mario.page.click('[data-act="seasonSave"]'); await mario.page.waitForSelector('#toast:has-text("Stagione salvata")');
+  ok(await mario.page.isVisible('text=Corsi: gio 19:30–21:00'), 'Stagione creata: riepilogo giorni e orari', await mario.page.textContent('#toast'));
+  // tipo istruttore: solo corsi → non compare tra chi può fare allenamenti
+  await mario.page.goto(APP + '#admin'); await mario.page.waitForSelector('text=Staff e accessi');
+  await mario.page.locator('.checkline:has-text("Istruttore Prova Due") button:has-text("Gestisci")').click();
+  await mario.page.locator('#pT').uncheck(); await mario.page.click('[data-act="permSave"]'); await mario.page.waitForSelector('#toast:has-text("Permessi aggiornati")');
+  await mario.page.goto(APP + '#plan'); await mario.page.waitForSelector('text=Assegnazione rapida');
+  const opts = await mario.page.locator('#qPerson option').allTextContents();
+  ok(!opts.includes('Istruttore Prova Due'), 'Istruttore «solo corsi» escluso dagli allenamenti');
   await mario.page.locator('button[data-act="planRemove"]').first().click(); await mario.page.waitForSelector('#toast:has-text("Tolto")'); ok(true, 'Pianifica turni: rimozione con conferma');
 
   // ---------- 5. Presenze: Mario registra, stampa, esporta CSV ----------

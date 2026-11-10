@@ -191,6 +191,26 @@ select test.ok(test.rows($$select 1 from public.audit_log where table_name='atte
 select set_config('request.jwt.claim.sub', :'i1', false);
 select test.fails($$select public.admin_purge_expired_attendance()$$, 'Istruttore: NON avvia la pulizia');
 
+-- Tipi di istruttore e stagione
+select set_config('request.jwt.claim.sub', :'mario', false);
+select public.admin_set_roles(:'i2', false, false, true, false);   -- solo corsi
+select test.fails($$select public.admin_assign((select a2 from ids), '00000000-0000-0000-0000-0000000000a2')$$, 'Istruttore solo corsi: non assegnabile agli allenamenti');
+select test.fails($$select public.admin_set_roles('00000000-0000-0000-0000-0000000000a2', false, false, false, false)$$, 'Ruoli: almeno uno obbligatorio');
+create temp table ss as select public.admin_save_season(null, '2026/2027', current_date + 60, current_date + 120,
+  '[{"kind":"allenamento","isodow":2,"start":"21:00","end":"22:30"},{"kind":"corso","isodow":4,"start":"20:00","end":"21:30"}]'::jsonb) r;
+grant select on ss to authenticated;
+select test.ok(((select r from ss)->>'created')::int between 16 and 20, 'Stagione: serate generate da giorni e orari');
+select test.ok(test.rows($$select 1 from public.activities where season_id is not null and kind='corso' and extract(isodow from date)=4 and start_time='20:00'$$) between 8 and 10, 'Stagione: corsi il giorno e all''ora indicati');
+select public.admin_assign((select id from public.activities where season_id is not null and kind='corso' order by date limit 1), :'i2');
+create temp table ss2 as select public.admin_save_season((select (r->>'season_id')::uuid from ss), '2026/2027', current_date + 60, current_date + 120,
+  '[{"kind":"allenamento","isodow":3,"start":"21:00","end":"22:30"}]'::jsonb) r;
+grant select on ss2 to authenticated;
+select test.ok(((select r from ss2)->>'kept_with_staff')::int = 1 and ((select r from ss2)->>'removed')::int >= 15, 'Stagione modificata: serate tolte, quelle con istruttori conservate e segnalate');
+select test.fails($$select public.admin_save_season(null, 'x', current_date + 70, current_date + 90, '[{"kind":"corso","isodow":1,"start":"20:00","end":"21:00"}]'::jsonb)$$, 'Stagioni sovrapposte rifiutate');
+select set_config('request.jwt.claim.sub', :'i1', false);
+select test.fails($$select public.admin_save_season(null, 'x', current_date + 500, current_date + 600, '[{"kind":"corso","isodow":1,"start":"20:00","end":"21:00"}]'::jsonb)$$, 'Istruttore: NON imposta la stagione');
+select test.ok(test.rows($$select 1 from public.seasons$$) = 1, 'Staff: vede la stagione');
+
 reset role;
 \echo
 select case when ok then 'OK   ' else 'FAIL ' end || name || coalesce('  ['||detail||']','') as risultato from test.results order by n;

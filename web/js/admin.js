@@ -7,12 +7,19 @@ import {
 
 const back = '<button class="alt" style="width:100%;margin-top:16px" data-act="go" data-view="home">⌂ Torna alla pagina iniziale</button>';
 const G = { adminData: null, created: null, sheet: null, month: todayISO().slice(0, 7) };
+// chi può essere assegnato a un tipo di attività (corsi / allenamenti)
+export const canTeach = (p, kind) => kind === 'altro' || (kind === 'corso' ? p.teaches_courses !== false : p.teaches_trainings !== false);
+const rolePills = (p) => `${p.is_admin ? '<span class="pill">responsabile</span> ' : ''}${p.teaches_courses !== false ? '<span class="pill">corsi</span> ' : ''}${p.teaches_trainings !== false ? '<span class="pill">allenamenti</span> ' : ''}${p.can_manage_workouts ? '<span class="pill gold">scrive gli allenamenti</span>' : ''}`;
+const roleChecks = (pre, p = {}) => `<div class="small" style="margin-top:6px">Cosa segue? (scelta rapida)</div>
+  <label class="check"><input type="checkbox" id="${pre}C" ${p.teaches_courses !== false ? 'checked' : ''}> Corsi</label>
+  <label class="check"><input type="checkbox" id="${pre}T" ${p.teaches_trainings !== false ? 'checked' : ''}> Allenamenti</label>
+  <label class="check"><input type="checkbox" id="${pre}W" ${p.can_manage_workouts ? 'checked' : ''}> Scrive e pubblica gli allenamenti (come Fabio)</label>`;
 
 // ======================= GIORNO (dal calendario) =======================
 export function dayAdminHtml(a, date) {
   if (!a) return `<details class="card"><summary>＋ Aggiungi un'attività in questo giorno</summary>${activityForm(null, date)}</details>`;
   const assigned = new Set(a.assignments.map((s) => s.profile_id));
-  const free = activeStaff().filter((p) => !assigned.has(p.id));
+  const free = activeStaff().filter((p) => !assigned.has(p.id) && canTeach(p, a.kind));
   return `<div class="small" style="margin-top:8px"><b>Gestione (solo Mario)</b></div>
     ${a.assignments.map((s) => {
       const r = S.data.responses?.[s.id];
@@ -103,13 +110,13 @@ export function renderAdmin(main) {
         <div class="row"><a class="btn alt" target="_blank" rel="noopener noreferrer" href="https://wa.me/?text=${encodeURIComponent(`Ciao ${G.created.name}, ecco l'accesso all'app dello staff Club dei Mari: ${location.origin + location.pathname}\nEmail: ${G.created.email}\nPassword temporanea: ${G.created.pw}\nAl primo accesso ti chiederà di sceglierne una tua.`)}">Invia su WhatsApp</a><button class="ghost" data-act="clearCreated">Ok, fatto</button></div></div>` : ''}
       ${staff.map((p) => `<div class="checkline"><span class="who"><b>${esc(p.display_name)}</b>${p.active ? '' : ' <span class="pill grey">disattivato</span>'}<br>
           <span class="small">${esc(emails[p.id] || '')}</span><br>
-          ${p.is_admin ? '<span class="pill">responsabile</span> ' : ''}${p.can_manage_workouts ? '<span class="pill">allenamenti</span> ' : ''}</span>
+          ${rolePills(p)}</span>
         <button class="alt sm" data-act="staffEdit" data-id="${p.id}">Gestisci</button></div>`).join('')}
       <details><summary>＋ Aggiungi membro dello staff</summary>
         <label for="nName">Nome visualizzato</label><input id="nName" maxlength="60" placeholder="es. Paolo R.">
         <label for="nEmail">Email personale</label><input id="nEmail" type="email" inputmode="email">
         <label for="nPw">Password temporanea</label><div class="row"><input id="nPw" style="flex:2" minlength="8"><button class="alt sm" style="flex:1" data-act="genPw">Genera</button></div>
-        <label class="check"><input type="checkbox" id="nW"> Può creare e pubblicare allenamenti</label>
+        ${roleChecks('n')}
         <button style="width:100%" data-act="staffCreate">Crea accesso</button>
         <p class="small">L'account non viene inviato automaticamente: decidi tu quando comunicarlo.</p></details></div>
 
@@ -154,8 +161,10 @@ A.staffCreate = (el) => {
   const name = $('nName').value.trim(), email = $('nEmail').value.trim(), pw = $('nPw').value;
   if (!name || !email) return toast('Inserisci nome ed email', true);
   if (pw.length < 8) return toast('La password temporanea deve avere almeno 8 caratteri', true);
+  if (!$('nC').checked && !$('nT').checked && !$('nW').checked) return toast('Scegli almeno: corsi, allenamenti o scrive gli allenamenti', true);
   act(async () => {
-    await callFunction('admin-users', { action: 'create', email, display_name: name, temp_password: pw, can_manage_workouts: $('nW').checked });
+    await callFunction('admin-users', { action: 'create', email, display_name: name, temp_password: pw,
+      can_manage_workouts: $('nW').checked, teaches_courses: $('nC').checked, teaches_trainings: $('nT').checked });
     G.created = { name, email, pw }; G.adminData = null;
   }, 'Account creato', { button: el });
 };
@@ -178,7 +187,7 @@ A.staffEdit = (el) => {
     <p class="small">${esc(G.adminData?.emails?.[p.id] || '')}</p>
     <div class="card"><h3>Permessi</h3>
       <label class="check"><input type="checkbox" id="pA" ${p.is_admin ? 'checked' : ''} ${self ? 'disabled' : ''}> Responsabile (turni, staff, accessi)</label>
-      <label class="check"><input type="checkbox" id="pW" ${p.can_manage_workouts ? 'checked' : ''}> Allenamenti: crea, verifica, pubblica</label>
+      ${roleChecks('p', p)}
       <p class="small">Le presenze effettive le registra solo il responsabile.</p>
       <button style="width:100%" data-act="permSave" data-id="${p.id}">Salva permessi</button></div>
     <div class="card"><h3>Nome</h3><input id="pName" value="${esc(p.display_name)}" maxlength="60"><button class="alt" style="width:100%" data-act="rename" data-id="${p.id}">Rinomina</button></div>
@@ -188,7 +197,7 @@ A.staffEdit = (el) => {
       ? `<p class="small">Disattivando, ${esc(p.display_name)} perde subito l'accesso a turni, calendario, allenamenti, comunicazioni, presenze e PDF su tutti i dispositivi collegati. Lo storico resta. Non è possibile cancellare file già scaricati o screenshot.</p><button class="warn" style="width:100%" data-act="setActive" data-id="${p.id}" data-a="0">Disattiva accesso</button>`
       : `<button class="ok" style="width:100%" data-act="setActive" data-id="${p.id}" data-a="1">Riattiva accesso</button>`}</div>`}`));
 };
-A.permSave = (el) => act(() => rpc('admin_set_permissions', { p_profile: el.dataset.id, p_admin: $('pA').checked, p_workouts: $('pW').checked }),
+A.permSave = (el) => act(() => rpc('admin_set_roles', { p_profile: el.dataset.id, p_admin: $('pA').checked, p_workouts: $('pW').checked, p_courses: $('pC').checked, p_trainings: $('pT').checked }),
   'Permessi aggiornati', { button: el }).then((ok) => ok && closeSheet());
 A.rename = (el) => act(() => rpc('admin_rename', { p_profile: el.dataset.id, p_name: $('pName').value }), 'Nome aggiornato', { button: el }).then((ok) => ok && closeSheet());
 A.resetPw = (el) => {
@@ -296,18 +305,21 @@ export function renderPlan(main) {
   // solo combinazioni giorno+tipo realmente presenti nel mese (es. «mercoledì · allenamento»)
   const combos = [...new Set(acts.filter((a) => a.status === 'attiva').map((a) => `${isoDow(a.date)}|${a.kind}`))]
     .sort((x, y) => x.split('|')[0] - y.split('|')[0] || x.localeCompare(y));
+  const season = (S.data.seasons || []).find((x) => x.start_date <= to && x.end_date >= from);
+  const qKind = (P.combo || combos[0] || '|allenamento').split('|')[1];
   main.innerHTML = `<h2>Pianifica turni</h2>
+    ${season ? `<div class="card soft" style="padding:12px"><b>Stagione ${esc(season.name)}</b> · dal ${esc(humanShort(season.start_date))} al ${esc(humanShort(season.end_date))}<br>
+      <span class="small">${esc(slotSummary(season.slots))}</span><br><button class="ghost sm" data-act="seasonEdit" data-id="${season.id}">✎ Modifica la stagione</button></div>`
+      : `<div class="card"><h3>1 · Prima imposta la stagione</h3><p>Quando iniziano e finiscono le attività quest'anno, in che giorni e a che ora ci sono allenamenti e corsi. L'app crea le serate; poi assegni gli istruttori mese per mese.</p>
+      <button style="width:100%" data-act="seasonEdit">＋ Imposta la stagione</button></div>`}
     <div class="calbar"><button class="alt sm" data-act="planMonth" data-n="-1" aria-label="Mese precedente">‹</button>
       <b style="flex:3;text-align:center;text-transform:capitalize">${esc(label)}</b>
       <button class="alt sm" data-act="planMonth" data-n="1" aria-label="Mese successivo">›</button></div>
-    ${!loaded ? '<div class="alert">Mese fuori dal periodo caricato.</div>' : !acts.length ? `<div class="card"><p>Nessuna serata inserita in questo mese.</p>
-      <button style="width:100%" data-act="planQuickSeries" data-k="allenamento" data-d="1,3,5">＋ Crea gli allenamenti lun · mer · ven</button>
-      <button class="alt" style="width:100%;margin-top:8px" data-act="planQuickSeries" data-k="corso" data-d="2,5,6">＋ Crea i corsi mar · ven · sab</button>
-      <p class="small">Per orari e altre combinazioni: Gestione Club → Calendario.</p></div>` : `
+    ${!loaded ? '<div class="alert">Mese fuori dal periodo caricato.</div>' : !acts.length ? `<div class="card muted">${season ? 'Nessuna serata in questo mese (fuori stagione o tutte annullate).' : 'Nessuna serata: imposta prima la stagione.'}</div>` : `
     <div class="card soft"><h3>Assegnazione rapida</h3>
       <div class="row" style="align-items:center">
-        <select id="qPerson" style="flex:1 1 140px" aria-label="Chi"><option value="">Chi?</option>${staff.map((p) => `<option value="${p.id}" ${P.person === p.id ? 'selected' : ''}>${esc(p.display_name)}</option>`).join('')}</select>
-        <select id="qCombo" style="flex:1 1 200px" aria-label="Quali serate">${combos.map((c) => { const [d, k] = c.split('|'); return `<option value="${c}" ${P.combo === c ? 'selected' : ''}>a tutti i ${DOW[d]} · ${KIND[k].toLowerCase()}</option>`; }).join('')}</select>
+        <select id="qPerson" style="flex:1 1 140px" aria-label="Chi"><option value="">Chi?</option>${staff.filter((p) => canTeach(p, qKind)).map((p) => `<option value="${p.id}" ${P.person === p.id ? 'selected' : ''}>${esc(p.display_name)}</option>`).join('')}</select>
+        <select id="qCombo" style="flex:1 1 200px" aria-label="Quali serate" data-change="planCombo">${combos.map((c) => { const [d, k] = c.split('|'); return `<option value="${c}" ${P.combo === c ? 'selected' : ''}>a tutti i ${DOW[d]} · ${KIND[k].toLowerCase()}</option>`; }).join('')}</select>
       </div>
       <button style="width:100%" data-act="planWeekday">Assegna per tutto il mese</button>
       <p class="small">Es. «Aldo a tutti i mercoledì»: chi è già assegnato non viene duplicato; le serate annullate sono saltate.</p></div>
@@ -317,7 +329,7 @@ export function renderPlan(main) {
       <b>${esc(humanShort(a.date))}</b> · ${esc(KIND[a.kind])}${a.start_time ? ' · ' + hhmm(a.start_time) : ''}${a.title ? ' · ' + esc(a.title) : ''}${a.status === 'annullata' ? ' <span class="pill red">annullata</span>' : ''}${a.provisional ? ' <span class="pill gold">da verificare</span>' : ''}
       <div class="row" style="gap:6px;margin:8px 0">${a.assignments.map((s) => { const r = S.data.responses?.[s.id];
         return `<button class="alt sm" data-act="planRemove" data-id="${s.id}" data-name="${esc(staffName(s.profile_id))}" aria-label="Togli ${esc(staffName(s.profile_id))}">${r === 'ci_sono' ? '✓ ' : r === 'non_ci_sono' ? '⚠ ' : ''}${esc(staffName(s.profile_id))} ✕</button>`; }).join('') || '<span class="small">nessuno assegnato</span>'}</div>
-      ${a.status === 'attiva' ? `<select data-change="planAdd" data-a="${a.id}" aria-label="Aggiungi istruttore" style="margin:0"><option value="">＋ aggiungi…</option>${staff.filter((p) => !assigned.has(p.id)).map((p) => `<option value="${p.id}">${esc(p.display_name)}</option>`).join('')}</select>` : ''}
+      ${a.status === 'attiva' ? `<select data-change="planAdd" data-a="${a.id}" aria-label="Aggiungi istruttore" style="margin:0"><option value="">＋ aggiungi…</option>${staff.filter((p) => !assigned.has(p.id) && canTeach(p, a.kind)).map((p) => `<option value="${p.id}">${esc(p.display_name)}</option>`).join('')}</select>` : ''}
     </div>`; }).join('')}`}
     <p class="small">✓ ha confermato · ⚠ ha detto «Non ci sono». Per orari, note o annullare una serata tocca il giorno nel Calendario.</p>
     ${back}`;
@@ -328,6 +340,7 @@ A.planMonth = (el) => { P.month = shiftMonth(P.month, +el.dataset.n); const { fr
   if (from < S.range.from || to > S.range.to) { S.range = { from: from < S.range.from ? from : S.range.from, to: to > S.range.to ? to : S.range.to }; act(async () => {}, null); } else R.render(); window.scrollTo(0, 0); };
 A.planAdd = (el) => { if (!el.value) return; keepY(act(() => rpc('admin_assign', { p_activity: el.dataset.a, p_profile: el.value }), 'Assegnato')); };
 A.planRemove = (el) => { if (!confirm(`Togliere ${el.dataset.name} da questa serata?`)) return; keepY(act(() => rpc('admin_unassign', { p_assignment: el.dataset.id }), 'Tolto', { button: el })); };
+A.planCombo = (el) => { P.combo = el.value; P.person = $('qPerson').value; R.render(); };
 A.planWeekday = (el) => {
   const p = $('qPerson').value; if (!p) return toast('Scegli la persona', true);
   const [dow, kind] = $('qCombo').value.split('|'); P.person = p; P.combo = $('qCombo').value;
@@ -351,4 +364,62 @@ A.planPrint = () => {
 A.purgeAttendance = (el) => {
   if (!confirm('Cancellare ora le presenze più vecchie di 12 mesi? Se ti servono, esporta prima il CSV dei mesi interessati.')) return;
   act(() => rpc('admin_purge_expired_attendance'), null, { button: el, reload: false }).then((n) => { if (n !== false) toast(`${n} presenze scadute cancellate`); });
+};
+
+
+// ======================= STAGIONE =======================
+const DOWS = [1, 2, 3, 4, 5, 6, 7];
+const DOW_SHORT = ['', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'];
+function slotSummary(slots) {
+  const part = (k, label) => {
+    const xs = slots.filter((x) => x.kind === k); if (!xs.length) return '';
+    const byTime = {}; for (const x of xs) (byTime[`${x.start}–${x.end}`] ||= []).push(x.isodow);
+    return `${label}: ` + Object.entries(byTime).map(([t, ds]) => `${ds.sort().map((d) => DOW_SHORT[d]).join(' · ')} ${t}`).join('; ');
+  };
+  return [part('allenamento', 'Allenamenti'), part('corso', 'Corsi')].filter(Boolean).join(' — ');
+}
+function defaultSeason() {
+  const now = new Date(); const y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  return { name: `${y}/${y + 1}`, start_date: `${y}-09-01`, end_date: `${y + 1}-06-30`, slots: [] };
+}
+function kindBlock(k, label, slots) {
+  const xs = slots.filter((x) => x.kind === k); const t = xs[0] || {};
+  return `<div class="card"><h3>${label}</h3>
+    <div class="small">In che giorni?</div>
+    <div class="row" style="gap:4px">${DOWS.map((d) => `<label class="check" style="flex:0 0 auto;margin:4px 6px 4px 0"><input type="checkbox" class="s-${k}" value="${d}" ${xs.some((x) => x.isodow === d) ? 'checked' : ''}> ${DOW_SHORT[d]}</label>`).join('')}</div>
+    <div class="row"><div style="flex:1"><label>Dalle</label><input type="time" id="s-${k}-start" value="${esc(t.start || (k === 'corso' ? '20:00' : '21:00'))}"></div>
+      <div style="flex:1"><label>Alle</label><input type="time" id="s-${k}-end" value="${esc(t.end || (k === 'corso' ? '21:30' : '22:30'))}"></div></div></div>`;
+}
+A.seasonEdit = (el) => {
+  const s = (S.data.seasons || []).find((x) => x.id === el.dataset.id) || defaultSeason();
+  import('./core.js').then(({ openSheet }) => openSheet(`<h2 id="sheetTitle">${s.id ? 'Modifica la stagione' : 'Imposta la stagione'}</h2>
+    <div class="card"><h3>Quest'anno</h3>
+      <label>Nome</label><input id="s-name" maxlength="40" value="${esc(s.name)}">
+      <div class="row"><div style="flex:1"><label>Dal</label><input type="date" id="s-start" value="${esc(s.start_date)}"></div>
+        <div style="flex:1"><label>Al</label><input type="date" id="s-end" value="${esc(s.end_date)}"></div></div></div>
+    ${kindBlock('allenamento', 'Quando ci sono gli allenamenti?', s.slots)}
+    ${kindBlock('corso', 'Quando ci sono i corsi?', s.slots)}
+    ${s.id ? '<p class="small">Se togli un giorno o cambi un orario, le serate future non più previste vengono tolte; quelle che hanno già istruttori assegnati restano e te le segnalo.</p>' : '<p class="small">Le serate vengono create dal giorno di oggi (o dall\'inizio della stagione) fino alla fine. Festività e chiusure si annullano poi dal Calendario.</p>'}
+    <button style="width:100%" data-act="seasonSave" data-id="${s.id || ''}">${s.id ? 'Salva le modifiche' : 'Crea la stagione e le serate'}</button>`));
+};
+A.seasonSave = (el) => {
+  const slots = [];
+  for (const k of ['allenamento', 'corso']) {
+    const start = $(`s-${k}-start`).value, end = $(`s-${k}-end`).value;
+    const days = [...document.querySelectorAll(`.s-${k}:checked`)].map((x) => +x.value);
+    if (days.length && !(start && end && start < end)) return toast('Controlla gli orari: «dalle» deve essere prima di «alle»', true);
+    for (const d of days) slots.push({ kind: k, isodow: d, start, end });
+  }
+  const name = $('s-name').value.trim(), from = $('s-start').value, to = $('s-end').value;
+  if (!name || !from || !to || to <= from) return toast('Controlla nome e date della stagione', true);
+  if (!slots.length) return toast('Scegli almeno un giorno di allenamento o di corso', true);
+  act(async () => {
+    const r = await rpc('admin_save_season', { p_id: el.dataset.id || null, p_name: name, p_start: from, p_end: to, p_slots: slots });
+    S.range = { from: from < S.range.from ? from : S.range.from, to: to > S.range.to ? to : S.range.to };
+    return r;
+  }, null, { button: el }).then((r) => {
+    if (!r || r === true) return;
+    closeSheet();
+    toast(`Stagione salvata: ${r.created} serate create${r.removed ? `, ${r.removed} tolte` : ''}${r.kept_with_staff ? `. ${r.kept_with_staff} serate non più previste hanno istruttori assegnati: controllale nel Calendario` : ''}`);
+  });
 };

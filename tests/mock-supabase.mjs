@@ -151,7 +151,7 @@ const api = http.createServer(async (req, res) => {
         if (users[email]) return send(res, 400, { error: 'A user with this email address has already been registered' });
         if (!b.temp_password || b.temp_password.length < 8) return send(res, 400, { error: 'La password temporanea deve avere almeno 8 caratteri' });
         const id = randomUUID(); await psql(`insert into auth.users(id,email) values (${q(id)}, ${q(email)})`);
-        const r = await callRpc(uid, 'admin_create_profile', { p_id: id, p_name: b.display_name, p_email: email, p_workouts: !!b.can_manage_workouts, p_attendance: !!b.can_manage_attendance });
+        const r = await callRpc(uid, 'admin_create_profile2', { p_id: id, p_name: b.display_name, p_email: email, p_workouts: !!b.can_manage_workouts, p_courses: b.teaches_courses !== false, p_trainings: b.teaches_trainings !== false });
         if (r.status !== 200) { await psql(`delete from auth.users where id=${q(id)}`); return send(res, 400, { error: r.body.message }); }
         users[email] = { id, password: b.temp_password }; saveUsers(); return send(res, 200, { ok: true, id });
       }

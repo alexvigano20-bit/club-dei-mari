@@ -65,9 +65,10 @@ Deno.serve(async (req) => {
         if (!validPassword(body.temp_password)) return json({ error: "La password temporanea deve avere almeno 8 caratteri" }, 400);
         const user = await authAdmin("users", "POST", { email, password: body.temp_password, email_confirm: true });
         try {
-          await rpc("admin_create_profile", {
+          await rpc("admin_create_profile2", {
             p_id: user.id, p_name: name, p_email: email,
-            p_workouts: !!body.can_manage_workouts, p_attendance: false,
+            p_workouts: !!body.can_manage_workouts,
+            p_courses: body.teaches_courses !== false, p_trainings: body.teaches_trainings !== false,
           }, jwt);
         } catch (e) {
           await authAdmin(`users/${user.id}`, "DELETE").catch(() => {}); // annulla: nessun account orfano
