@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#073e59">
+  <meta name="description" content="Turni, calendario, allenamenti e comunicazioni dello staff del Club dei Mari">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321; frame-src 'self' blob: https://*.supabase.co http://localhost:54321; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Club dei Mari">
+  <title>Club dei Mari · Staff</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="stylesheet" href="./css/app.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="top" id="top">
+      <div class="headrow">
+        <div class="brand">🌊 CLUB DEI MARI</div>
+        <button class="guide" id="guideBtn" type="button" aria-label="Apri la guida">ⓘ Guida</button>
+      </div>
+      <h1 id="greeting">Club dei Mari</h1>
+      <p id="subtitle">Turni e allenamenti, senza complicazioni.</p>
+    </header>
+    <div id="banner" class="banner hidden" role="status" aria-live="polite"></div>
+    <main id="main" tabindex="-1"><p class="muted center">Caricamento…</p></main>
+    <p class="foot" id="foot"></p>
+  </div>
+
+  <nav class="bottomnav hidden" id="bottomnav" aria-label="Navigazione principale">
+    <button type="button" data-view="mine"><span aria-hidden="true">🙋</span>I miei turni</button>
+    <button type="button" data-view="work"><span aria-hidden="true">🏊</span>Allenamenti</button>
+    <button type="button" data-view="calendar"><span aria-hidden="true">📅</span>Calendario</button>
+    <button type="button" data-view="notices"><span aria-hidden="true">🔔</span>Comunicazioni<b class="badge hidden" id="noticeBadge"></b></button>
+  </nav>
+
+  <div id="sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-backdrop" data-close="sheet"></div>
+    <div class="sheet-panel"><button class="sheet-close" type="button" data-close="sheet" aria-label="Chiudi">✕</button><div id="sheetBody"></div></div>
+  </div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <div id="printArea" class="print-area" aria-hidden="true"></div>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+backup/
+tests/.mock-users.json
+tests/.mock-storage/
+node_modules/
+.env
+*.local

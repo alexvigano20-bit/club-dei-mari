@@ -1,0 +1,21 @@
+// Casi limite del caricamento PDF: scansione senza testo, file non PDF
+import { createRequire } from 'node:module';
+import { writeFileSync, readFileSync } from 'node:fs';
+const require = createRequire(import.meta.url);
+const { chromium, devices } = require('playwright');
+const { PDFDocument } = require('/opt/npm-tools/node_modules/pdf-lib');
+const tmp = '/tmp/claude-0';
+const doc = await PDFDocument.create(); const png = await doc.embedPng(readFileSync(new URL('../web/icons/icon-512.png', import.meta.url)));
+doc.addPage([595, 842]).drawImage(png, { x: 40, y: 300, width: 500, height: 500 });
+writeFileSync(`${tmp}/scansione.pdf`, await doc.save()); writeFileSync(`${tmp}/finto.pdf`, 'non sono un pdf');
+let fails = 0; const ok = (c, n) => { console.log(`${c ? 'OK  ' : 'FAIL'} ${n}`); if (!c) fails++; };
+const b = await chromium.launch(); const ctx = await b.newContext(devices['iPhone 13']); const p = await ctx.newPage();
+p.on('dialog', (d) => d.accept());
+await p.goto('http://localhost:8080/'); await p.fill('#email', 'fabio@prova.invalid'); await p.fill('#password', 'Prova-2026!'); await p.click('button[type=submit]');
+await p.waitForSelector('#greeting:has-text("Ciao")'); if (await p.isVisible('text=Salta la guida')) await p.click('text=Salta la guida');
+await p.click('.bottomnav button:has-text("Allenamenti")'); await p.waitForSelector('text=Carica PDF');
+await p.setInputFiles('#pdfInput', `${tmp}/finto.pdf`); await p.waitForSelector('#toast:has-text("non è un PDF valido")'); ok(true, 'File non PDF rifiutato');
+await p.setInputFiles('#pdfInput', `${tmp}/scansione.pdf`); await p.waitForSelector('text=non contiene testo leggibile', { timeout: 20000 }); ok(true, 'PDF scansionato: messaggio chiaro, nessuna estrazione finta');
+await p.click('text=Crea le bozze'); await p.waitForSelector('text=Nessun testo estratto dal PDF', { timeout: 8000 }).catch(async (e) => { await p.screenshot({ path: tmp + '/shots/err-edge.png' }); throw e; }); ok(true, 'PDF scansionato: archiviato, bozza manuale con confronto all\'originale');
+await p.screenshot({ path: `${tmp}/shots/21-scansione.png` });
+await b.close(); console.log(fails ? `${fails} falliti` : 'tutti superati'); process.exit(fails ? 1 : 0);

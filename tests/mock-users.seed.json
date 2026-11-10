@@ -1,0 +1,6 @@
+{
+  "mario@prova.invalid": { "id": "10000000-0000-0000-0000-00000000000a", "password": "Prova-2026!" },
+  "fabio@prova.invalid": { "id": "10000000-0000-0000-0000-00000000000f", "password": "Prova-2026!" },
+  "istruttore1@prova.invalid": { "id": "10000000-0000-0000-0000-0000000000b1", "password": "Prova-2026!" },
+  "istruttore2@prova.invalid": { "id": "10000000-0000-0000-0000-0000000000b2", "password": "Prova-2026!" }
+}

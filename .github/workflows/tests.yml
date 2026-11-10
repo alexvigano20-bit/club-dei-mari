@@ -1,0 +1,21 @@
+# Test automatici di sicurezza del database (RLS, revoca, presenze, allenamenti) su Postgres.
+name: test-database
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  rls:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_HOST_AUTH_METHOD: trust }
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Migrazioni e test
+        env: { PGHOST: localhost, PGPORT: 5432 }
+        run: |
+          ./scripts/local-db-reset.sh
+          psql -h localhost -U postgres -d cdm_test -q -o /dev/null -f tests/rls_test.sql
+          psql -h localhost -U postgres -d cdm_test -At -c "select name from test.results where not ok" | tee failed.txt
+          test ! -s failed.txt
