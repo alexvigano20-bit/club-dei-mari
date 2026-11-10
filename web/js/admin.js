@@ -1,6 +1,6 @@
 // Club dei Mari · Gestione Club (solo Mario) e Registro presenze
 import { rpc, callFunction } from './api.js';
-import { availSummaryHtml, addOptions, confirmRest } from './availability.js';
+import { availSummaryHtml, addOptions, confirmRest, restInfo, reminderHtml } from './availability.js';
 import {
   $, esc, S, R, A, act, toast, isAdmin, canAttendance, staffName, activeStaff, human, humanShort, dt, hhmm, KIND,
   activityLabel, todayISO, printHtml, printHeader, download, csv, openRequests, closeSheet, availOf,
@@ -94,6 +94,7 @@ export function renderAdmin(main) {
     <div class="card"><h3>Sostituzioni da gestire (${reqs.length})</h3>
       ${reqs.length ? reqs.map((r) => `<div class="item"><b>${esc(human(r.date))}</b> · ${esc(staffName(r.requested_by))}<br>${replacementForm(r)}</div>`).join('') : '<p class="muted">Nessuna richiesta aperta.</p>'}</div>
 
+    ${[G.month, shiftMonth(G.month, 1)].map((m) => reminderHtml(m, activeStaff())).join('')}
     <div class="card"><h3>Calendario</h3>
       <button style="width:100%" data-act="go" data-view="plan">Pianifica i turni del mese</button>
       <p class="muted">Oppure tocca un giorno nel <a href="#calendar" data-act="go" data-view="calendar">Calendario</a> per orari, note o per annullare una serata.</p>
@@ -291,7 +292,7 @@ A.attCsv = () => {
 // Una pagina per mese: tutte le serate in elenco, nomi da aggiungere/togliere
 // con un tocco e l'assegnazione rapida «Aldo a tutti i mercoledì del mese».
 const DOW = ['', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
-const P = { month: todayISO().slice(0, 7), person: '', combo: '' };
+const P = { month: todayISO().slice(0, 7), person: '', combo: '', mode: 'serate' };
 const shiftMonth = (ym, n) => { const [y, m] = ym.split('-').map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 const isoDow = (date) => { const d = new Date(date + 'T12:00').getDay(); return d === 0 ? 7 : d; };
 
@@ -318,6 +319,9 @@ export function renderPlan(main) {
       <b style="flex:3;text-align:center;text-transform:capitalize">${esc(label)}</b>
       <button class="alt sm" data-act="planMonth" data-n="1" aria-label="Mese successivo">›</button></div>
     ${!loaded ? '<div class="alert">Mese fuori dal periodo caricato.</div>' : !acts.length ? `<div class="card muted">${season ? 'Nessuna serata in questo mese (fuori stagione o tutte annullate).' : 'Nessuna serata: imposta prima la stagione.'}</div>` : `
+    ${reminderHtml(P.month, staff)}
+    ${season ? `<div class="viewsw" role="group" aria-label="Vista"><button type="button" class="${P.mode === 'serate' ? 'on' : ''}" data-act="planMode" data-m="serate" aria-pressed="${P.mode === 'serate'}">Per singola serata</button><button type="button" class="${P.mode === 'griglia' ? 'on' : ''}" data-act="planMode" data-m="griglia" aria-pressed="${P.mode === 'griglia'}">Calendario del mese</button></div>` : ''}
+    ${season && P.mode === 'griglia' ? gridHtml(acts.filter((a) => a.status === 'attiva'), staff) + availSummaryHtml(P.month, staff) : `
     <div class="card soft"><h3>Assegnazione rapida</h3>
       <div class="row" style="align-items:center">
         <select id="qPerson" style="flex:1 1 140px" aria-label="Chi"><option value="">Chi?</option>${staff.filter((p) => canTeach(p, qKind)).map((p) => `<option value="${p.id}" ${P.person === p.id ? 'selected' : ''}>${esc(p.display_name)}</option>`).join('')}</select>
@@ -333,10 +337,47 @@ export function renderPlan(main) {
       <div class="row" style="gap:6px;margin:8px 0">${a.assignments.map((s) => { const r = S.data.responses?.[s.id];
         return `<button class="alt sm" data-act="planRemove" data-id="${s.id}" data-name="${esc(staffName(s.profile_id))}" aria-label="Togli ${esc(staffName(s.profile_id))}">${r === 'ci_sono' ? '✓ ' : r === 'non_ci_sono' ? '⚠︎ ' : ''}${esc(staffName(s.profile_id))} ✕</button>`; }).join('') || '<span class="small">nessuno assegnato</span>'}</div>
       ${a.status === 'attiva' ? `<select data-change="planAdd" data-a="${a.id}" aria-label="Aggiungi istruttore" style="margin:0"><option value="">＋ aggiungi…</option>${addOptions(a, staff.filter((p) => !assigned.has(p.id) && canTeach(p, a.kind)))}</select>` : ''}
-    </div>`; }).join('')}`}
+    </div>`; }).join('')}`}`}
     <p class="small">✓ ha confermato · ⚠︎ ha detto «Non ci sono». Per orari, note o annullare una serata tocca il giorno nel Calendario.</p>
     ${back}`;
 }
+
+// Calendario del mese: staff sulle righe, serate sulle colonne. Un tocco assegna o toglie.
+const DOW_INI = ['', 'L', 'M', 'M', 'G', 'V', 'S', 'D'];
+const KIND_INI = { allenamento: 'All', corso: 'Cor', altro: 'Att' };
+function gridHtml(acts, staff) {
+  if (!acts.length) return '<div class="card muted">Nessuna serata attiva in questo mese.</div>';
+  const people = staff.filter((p) => acts.some((a) => canTeach(p, a.kind)));
+  const head = acts.map((a) => `<th scope="col" class="k-${a.kind}"><span>${DOW_INI[isoDow(a.date)]}</span><b>${+a.date.slice(8)}</b><span>${KIND_INI[a.kind]}</span></th>`).join('');
+  const cell = (p, a) => {
+    if (!canTeach(p, a.kind)) return '<td class="g-na" aria-label="non previsto per il suo ruolo"></td>';
+    const s = a.assignments.find((x) => x.profile_id === p.id); const v = availOf(p.id, a.id);
+    const when = humanShort(a.date);
+    if (s) { const r = S.data.responses?.[s.id];
+      return `<td><button class="g-as${r === 'non_ci_sono' ? ' g-alert' : ''}" data-act="gridCell" data-a="${a.id}" data-p="${p.id}" data-s="${s.id}" aria-label="${esc(p.display_name)}, ${esc(when)}: assegnato${r === 'ci_sono' ? ', ha confermato' : r === 'non_ci_sono' ? ', ha detto che non c\'è' : ''}. Tocca per togliere">${r === 'ci_sono' ? '✓' : r === 'non_ci_sono' ? '!' : '●'}</button></td>`; }
+    return `<td><button class="${v === true ? 'g-yes' : v === false ? 'g-no' : 'g-und'}" data-act="gridCell" data-a="${a.id}" data-p="${p.id}" aria-label="${esc(p.display_name)}, ${esc(when)}: ${v === true ? 'disponibile' : v === false ? 'NON disponibile' : 'non ha dichiarato'}. Tocca per assegnare">${v === true ? 'sì' : v === false ? 'no' : '·'}</button></td>`;
+  };
+  return `<div class="card" style="padding:10px"><h3 style="margin:2px 4px 8px">Calendario del mese</h3>
+    <div class="gridwrap" id="gridWrap"><table class="pgrid"><thead><tr><th scope="col" class="g-name">Staff</th>${head}</tr></thead><tbody>
+    ${people.map((p) => { const rest = restInfo(p.id, P.month); const n = acts.filter((a) => a.assignments.some((x) => x.profile_id === p.id)).length;
+      return `<tr><th scope="row" class="g-name">${esc(p.display_name)}<small>${n} ${n === 1 ? 'serata' : 'serate'}${rest ? ' · scarico' : ''}</small></th>${acts.map((a) => cell(p, a)).join('')}</tr>`; }).join('')}
+    <tr class="g-tot"><th scope="row" class="g-name">Assegnati</th>${acts.map((a) => `<td>${a.assignments.length}</td>`).join('')}</tr>
+    </tbody></table></div>
+    <p class="small"><span class="g-key g-as">●</span> assegnato · <span class="g-key g-as">✓</span> ha confermato · <span class="g-key g-as g-alert">!</span> ha detto «Non ci sono» · <span class="g-key g-yes">sì</span> disponibile · <span class="g-key g-no">no</span> non disponibile · <span class="g-key g-und">·</span> non ha dichiarato. Tocca una casella per assegnare o togliere. «Scarico»: ha allenato il mese prima (indicazione di buon senso).</p></div>`;
+}
+const keepGrid = (p) => { const w = $('gridWrap'), x = w ? w.scrollLeft : 0, y = window.scrollY;
+  return p.then((r) => { window.scrollTo(0, y); const w2 = $('gridWrap'); if (w2) w2.scrollLeft = x; return r; }); };
+A.planMode = (el) => { P.mode = el.dataset.m; R.render(); };
+A.gridCell = (el) => {
+  const a = S.data.activities.find((x) => x.id === el.dataset.a); const p = el.dataset.p; const name = staffName(p);
+  if (el.dataset.s) {
+    if (!confirm(`Togliere ${name} dalla serata di ${humanShort(a.date)}?`)) return;
+    return keepGrid(act(() => rpc('admin_unassign', { p_assignment: el.dataset.s }), 'Tolto'));
+  }
+  const no = availOf(p, a.id) === false;
+  if ((no && !confirm(`${name} ha dichiarato che quella sera NON c'è. Assegnarlo comunque?`)) || (!no && !confirmRest(p, a.date, a.kind))) return;
+  keepGrid(act(() => rpc('admin_assign', { p_activity: a.id, p_profile: p }), 'Assegnato'));
+};
 
 const keepY = (p) => { const y = window.scrollY; return p.then((r) => { window.scrollTo(0, y); return r; }); };
 A.planMonth = (el) => { P.month = shiftMonth(P.month, +el.dataset.n); const { from, to } = monthRange(P.month);

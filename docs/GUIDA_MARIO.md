@@ -26,8 +26,10 @@ Gestione Club → nome → Gestisci → «Reimposta password». Comunica la pass
 
 ## Disponibilità dello staff
 - Ognuno dichiara, mese per mese, le serate in cui c'è o non c'è, con una nota (es. «il martedì arrivo alle 21:30»).
-- In «Pianifica turni» apri «Disponibilità dichiarate»: vedi chi ha risposto, le note e chi non ha ancora dichiarato (puoi sollecitarlo su WhatsApp).
-- Nel menu «＋ aggiungi» compaiono prima i disponibili; l'app ti avvisa se assegni chi ha detto di non esserci, o chi ha allenato il mese prima (mese di scarico).
+- In «Pianifica turni» apri «Disponibilità dichiarate»: vedi chi ha risposto, le note e chi non ha ancora dichiarato.
+- **Promemoria:** se manca qualcuno, in Gestione Club e in «Pianifica turni» compare «Disponibilità mancanti» con i nomi e il pulsante «Manda il promemoria su WhatsApp» (messaggio già scritto con il link all'app: scegli il gruppo dello staff). Oppure «Copia il messaggio».
+- **Calendario del mese:** dopo aver impostato la stagione, in «Pianifica turni» scegli «Calendario del mese»: staff sulle righe, serate sulle colonne. Ogni casella dice sì / no / non dichiarato; un tocco assegna, un tocco su una casella blu toglie. «Per singola serata» torna alla vista di prima.
+- Nel menu «＋ aggiungi» compaiono prima i disponibili; l'app ti avvisa se assegni chi ha detto di non esserci, o chi ha allenato il mese prima (mese di scarico: indicazione di buon senso, non un blocco).
 - L'assegnazione rapida «a tutti i mercoledì» salta le serate in cui la persona ha detto di non esserci.
 
 ## Calendario

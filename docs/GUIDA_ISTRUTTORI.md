@@ -6,7 +6,7 @@
 - iPhone: in Safari tocca Condividi e poi «Aggiungi alla schermata Home».
 - Android: in Chrome tocca il menu ⋮ e poi «Installa app».
 
-**Per prima cosa: le tue disponibilità.** Da «I miei turni» → «Le mie disponibilità» scegli il mese e segna le serate in cui ci sei (✓) e quelle in cui non puoi (✕), per lavoro, orari o viaggi; aggiungi una nota se serve. Puoi aggiornarle in qualsiasi momento durante l'anno. Le vede solo Mario, che le usa per fare i turni.
+**Per prima cosa: le tue disponibilità.** Da «I miei turni» → «Le mie disponibilità» scegli il mese e segna le serate in cui ci sei (✓) e quelle in cui non puoi (✕), per lavoro, orari o viaggi; aggiungi una nota se serve. Se ci sei sempre negli stessi giorni, «Ripeti ogni settimana» li segna tutti in un colpo (anche fino a fine stagione); poi correggi solo le eccezioni. Puoi aggiornarle in qualsiasi momento durante l'anno. Le vede solo Mario, che le usa per fare i turni.
 
 In basso ci sono sempre quattro pulsanti:
 

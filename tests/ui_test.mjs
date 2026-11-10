@@ -178,6 +178,33 @@ try {
   const corsoOpts = await mario.page.locator('select[data-change="planAdd"]').first().locator('option').allTextContents();
   ok(corsoOpts.some((o) => /Istruttore Prova Due — NON disponibile/.test(o)) || corsoOpts.every((o) => !o.includes('Istruttore Prova Due')), 'Menu «aggiungi»: indica chi non è disponibile', corsoOpts.join(' | ').slice(0, 160));
   await shot(mario, '25-pianifica-disponibilita');
+  // Promemoria a chi non ha dichiarato: messaggio WhatsApp pronto
+  await mario.page.goto(APP + '#plan'); await mario.page.reload(); await mario.page.waitForSelector('h2:has-text("Pianifica turni")');
+  await mario.page.click('[data-act="planMonth"][data-n="1"]'); await mario.page.waitForSelector('text=Disponibilità mancanti per');
+  const remHref = await mario.page.locator('#remCard a:has-text("WhatsApp")').getAttribute('href');
+  const remTxt = decodeURIComponent(remHref.split('text=')[1]);
+  ok(/Mancano ancora: .*Istruttore Prova Uno/.test(remTxt) && !remTxt.includes('Istruttore Prova Due'), 'Promemoria: elenca solo chi non ha dichiarato', remTxt.split('\n').pop());
+  // Calendario del mese (griglia): un tocco assegna e toglie
+  await mario.page.click('[data-act="planMode"][data-m="griglia"]'); await mario.page.waitForSelector('.pgrid');
+  const cellSel = '.pgrid tr:has(th:has-text("Istruttore Prova Uno")) button[data-act="gridCell"]:not([data-s])';
+  const before = await mario.page.locator('.pgrid tr:has(th:has-text("Istruttore Prova Uno")) button.g-as').count();
+  await mario.page.locator(cellSel).first().click(); await mario.page.waitForSelector('#toast:has-text("Assegnato")');
+  await mario.page.waitForFunction((b) => document.querySelectorAll('.pgrid tr').length && [...document.querySelectorAll('.pgrid tr')].find((r) => r.textContent.includes('Istruttore Prova Uno'))?.querySelectorAll('button.g-as').length === b + 1, before);
+  ok(true, 'Griglia del mese: assegnazione con un tocco');
+  ok(await mario.page.locator('.pgrid tr:has(th:has-text("Istruttore Prova Due")) button.g-no').count() >= 1, 'Griglia: mostra chi ha detto «non ci sono»');
+  await shot(mario, '26-griglia-mese');
+  await mario.page.locator('.pgrid tr:has(th:has-text("Istruttore Prova Uno")) button.g-as').first().click(); await mario.page.waitForSelector('#toast:has-text("Tolto")');
+  ok(true, 'Griglia: rimozione con conferma');
+  await mario.page.click('[data-act="planMode"][data-m="serate"]');
+  // Disponibilità ricorrente: «ci sono tutti i martedì»
+  await nav(i1, 'I miei turni'); await i1.page.click('button:has-text("Le mie disponibilità")'); await i1.page.waitForSelector('h2:has-text("Le mie disponibilità")');
+  await i1.page.click('[data-act="availMonth"][data-n="1"]'); await i1.page.waitForSelector('summary:has-text("Ripeti ogni settimana")');
+  await i1.page.click('summary:has-text("Ripeti ogni settimana")');
+  const firstDay = await i1.page.locator('.wkDay').first().getAttribute('value');
+  await i1.page.locator('.wkDay').first().check(); await shot(i1, '27-disponibilita-ricorrente');
+  await i1.page.click('[data-act="availWeekly"]'); await i1.page.waitForSelector('#toast:has-text("Disponibilità salvate")');
+  const okN = await i1.page.locator('[data-act="availToggle"].ok').count(), noN = await i1.page.locator('[data-act="availToggle"].warn').count();
+  ok(okN >= 2 && noN >= 2, 'Disponibilità ricorrente: sì nel giorno scelto, no negli altri', `giorno ${firstDay}: ${okN} sì, ${noN} no`);
   await mario.page.goto(APP + '#plan'); await mario.page.reload(); await mario.page.waitForSelector('text=Assegnazione rapida');
   await mario.page.locator('button[data-act="planRemove"]').first().click(); await mario.page.waitForSelector('#toast:has-text("Tolto")'); ok(true, 'Pianifica turni: rimozione con conferma');
 

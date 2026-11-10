@@ -62,6 +62,7 @@ export function renderAvail(main) {
       <b style="flex:3;text-align:center;text-transform:capitalize">${esc(monthName(V.month))}</b>
       <button class="alt sm" data-act="availMonth" data-n="1" aria-label="Mese successivo">›</button></div>
     ${!acts.length ? '<div class="card muted">Nessuna serata da dichiarare in questo mese (fuori stagione, già passate o non previste per il tuo ruolo).</div>' : `
+    ${weeklyHtml()}
     <div class="row"><button class="ok" data-act="availAll" data-v="1">Ci sono a tutte</button><button class="warn" data-act="availAll" data-v="0">Non ci sono per tutto il mese</button></div>
     <p class="small">${yes} sì · ${no} no · ${acts.length - yes - no} da dichiarare</p>
     ${[...groups.entries()].map(([k, list]) => { const [d, kind, t] = k.split('|');
@@ -73,6 +74,46 @@ export function renderAvail(main) {
       <button class="alt" style="width:100%" data-act="availNoteSave">Salva la nota</button></div>`}
     <button class="alt" style="width:100%;margin-top:16px" data-act="go" data-view="mine">← I miei turni</button>`;
 }
+
+// Disponibilità ricorrente: «ci sono tutti i martedì e giovedì», per il mese o fino a fine stagione
+const DOW_SHORT = ['', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+function seasonEndFor(ym) {
+  const s = (S.data?.seasons || []).find((x) => x.start_date.slice(0, 7) <= ym && x.end_date.slice(0, 7) >= ym);
+  return s ? s.end_date : null;
+}
+function scopeActs(scope) {
+  const t = todayISO(), end = scope === 'season' ? seasonEndFor(V.month) : null;
+  return (S.data?.activities || []).filter((a) => a.status === 'attiva' && a.date >= t && teaches(S.me, a.kind)
+    && (end ? a.date >= V.month + '-01' && a.date <= end : ymOf(a.date) === V.month));
+}
+function weeklyHtml() {
+  const end = seasonEndFor(V.month);
+  const days = [...new Set(scopeActs(end ? 'season' : 'month').map((a) => isoDow(a.date)))].sort();
+  if (days.length < 2) return '';
+  return `<details class="card" id="weekly"><summary>Ripeti ogni settimana (es. «ci sono tutti i martedì e giovedì»)</summary>
+    <p class="small">Scegli i giorni in cui di solito ci sei. Poi puoi correggere le singole date qui sotto per le eccezioni.</p>
+    <div class="row">${days.map((d) => `<label class="check" style="flex:0 0 auto"><input type="checkbox" class="wkDay" value="${d}"> ${DOW_SHORT[d]}</label>`).join('')}</div>
+    <label class="check"><input type="checkbox" id="wkOthers" checked> Negli altri giorni segna «non ci sono»</label>
+    ${end ? `<label for="wkScope">Per quale periodo</label><select id="wkScope"><option value="month">Solo ${esc(monthName(V.month))}</option><option value="season">Da ${esc(monthName(V.month))} a fine stagione (${esc(humanShort(end))})</option></select>` : ''}
+    <button style="width:100%" data-act="availWeekly">Applica</button></details>`;
+}
+A.availWeekly = async (el) => {
+  const days = [...document.querySelectorAll('.wkDay:checked')].map((x) => +x.value);
+  if (!days.length) return toast('Scegli almeno un giorno', true);
+  const others = $('wkOthers').checked, scope = $('wkScope')?.value || 'month';
+  const acts = scopeActs(scope);
+  const yes = acts.filter((a) => days.includes(isoDow(a.date))).map((a) => a.id);
+  const no = others ? acts.filter((a) => !days.includes(isoDow(a.date))).map((a) => a.id) : [];
+  const period = scope === 'season' ? `da ${monthName(V.month)} a fine stagione` : monthName(V.month);
+  if (!confirm(`Segno che ci sei ${days.map((d) => DOW[d]).join(', ')} (${yes.length} serate)${others ? ` e che non ci sei negli altri giorni (${no.length} serate)` : ''}, per ${period}. Le risposte già date in quelle serate vengono sostituite. Confermi?`)) return;
+  const chunks = (ids) => { const out = []; for (let i = 0; i < ids.length; i += 150) out.push(ids.slice(i, i + 150)); return out; };
+  const y = window.scrollY;
+  await act(async () => {
+    for (const c of chunks(yes)) await rpc('set_my_availability', { p_activities: c, p_available: true });
+    for (const c of chunks(no)) await rpc('set_my_availability', { p_activities: c, p_available: false });
+  }, `Disponibilità salvate per ${period}: ora correggi le eccezioni`, { button: el });
+  window.scrollTo(0, y);
+};
 
 const save = (ids, v, msg) => { const y = window.scrollY;
   return act(() => rpc('set_my_availability', { p_activities: ids, p_available: v }), msg).then(() => window.scrollTo(0, y)); };
@@ -104,6 +145,33 @@ export function availSummaryHtml(ym, staff) {
   return `<details class="card"><summary>Disponibilità dichiarate per ${esc(monthName(ym))}</summary>${rows.join('')}
     <p class="small">Chi non ha dichiarato può comunque essere assegnato. Nell'elenco «＋ aggiungi» compaiono prima i disponibili.</p></details>`;
 }
+
+// Chi non ha ancora dichiarato nulla per il mese (né serate né nota)
+export function missingFor(ym, staff) {
+  const acts = (S.data?.activities || []).filter((a) => a.status === 'attiva' && ymOf(a.date) === ym && a.date >= todayISO());
+  return staff.filter((p) => { const mine = acts.filter((a) => teaches(p, a.kind));
+    return mine.length && !mine.some((a) => availOf(p.id, a.id) !== undefined) && !availNote(p.id, ym); });
+}
+const reminderText = (ym, names) => `Ciao a tutti, promemoria per chi non l'ha ancora fatto: indicate nell'app dello staff le vostre disponibilità per ${monthName(ym)}, così posso preparare i turni.
+Si fa da «I miei turni» → «Le mie disponibilità»: ${location.origin + location.pathname}
+Mancano ancora: ${names.join(', ')}.
+Grazie!`;
+// Per Mario: promemoria pronto da mandare su WhatsApp a chi non ha risposto
+export function reminderHtml(ym, staff) {
+  const miss = missingFor(ym, staff);
+  if (!miss.length) return '';
+  const names = miss.map((p) => p.display_name);
+  return `<div class="card soft" id="remCard"><h3>Disponibilità mancanti per ${esc(monthName(ym))} (${miss.length})</h3>
+    <p>Non hanno ancora dichiarato nulla: <b>${names.map(esc).join(', ')}</b>.</p>
+    <div class="row"><a class="btn" target="_blank" rel="noopener noreferrer" href="https://wa.me/?text=${encodeURIComponent(reminderText(ym, names))}">Manda il promemoria su WhatsApp</a>
+      <button class="alt" data-act="remCopy" data-m="${ym}">Copia il messaggio</button></div>
+    <p class="small">WhatsApp si apre con il messaggio già scritto: scegli il gruppo dello staff o le singole persone. Anche nell'app, finché non rispondono, vedono in prima pagina l'invito a indicare le disponibilità.</p></div>`;
+}
+A.remCopy = async (el) => {
+  const names = missingFor(el.dataset.m, (S.data?.staff || []).filter((p) => p.active)).map((p) => p.display_name);
+  try { await navigator.clipboard.writeText(reminderText(el.dataset.m, names)); toast('Messaggio copiato: incollalo su WhatsApp'); }
+  catch { toast('Copia non riuscita: usa il pulsante WhatsApp', true); }
+};
 
 // Opzioni del menu «aggiungi» ordinate: disponibili, non dichiarati, non disponibili
 export function addOptions(a, candidates) {
