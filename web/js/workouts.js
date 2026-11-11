@@ -2,7 +2,7 @@
 // revisione affiancata, versioni e pubblicazione per Fabio e Mario.
 import { CONFIG } from './config.js';
 import { rpc, uploadPdf, signedUrl } from './api.js';
-import { $, esc, S, R, A, act, toast, loadState, canWorkouts, dt, printHtml, printHeader, download, todayISO } from './core.js';
+import { $, esc, S, R, A, act, toast, loadState, canWorkouts, dt, printHtml, printHeader, download, todayISO, closeSheet } from './core.js';
 import { parseWorkouts, linesFromTextContent, integrity } from './workout-parse.js';
 
 const MAX_PDF = 10 * 1024 * 1024;
@@ -24,24 +24,38 @@ const blocksHtml = (v) => `${v.summary ? `<p class="summary">${esc(v.summary)}</
 // ---------------- ELENCO ----------------
 // Stagione sportiva da settembre ad agosto: «2026/27»
 export const seasonOf = (iso) => { const y = +iso.slice(0, 4), m = +iso.slice(5, 7); const s = m >= 9 ? y : y - 1; return `${s}/${String(s + 1).slice(2)}`; };
+// Settimane: ogni scheda vale dal lunedì alla domenica
+const isoLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+export const mondayOf = (iso) => { const d = new Date(iso + 'T12:00'); d.setDate(d.getDate() - ((d.getDay() || 7) - 1)); return isoLocal(d); };
+const addDays = (iso, n) => { const d = new Date(iso + 'T12:00'); d.setDate(d.getDate() + n); return isoLocal(d); };
+const dm = (iso) => new Date(iso + 'T12:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+export const weekLabel = (iso) => `settimana dal ${dm(iso)} al ${dm(addDays(iso, 6))}`;
+const normT = (t) => (t || '').toLowerCase().replace(/[\u2013\u2014-]+/g, ' ').replace(/\s+/g, ' ').trim();
+// Schede pubblicate per la settimana in corso (di solito una)
+export const thisWeekWorkouts = () => { const m = mondayOf(todayISO()); return (S.workouts || []).filter((w) => w.status === 'pubblicato' && w.published && w.week_of === m); };
+// Scheda pubblicata per la settimana di una data (per il giorno nel calendario e per i turni)
+export const workoutForDate = (iso) => { const m = mondayOf(iso); return (S.workouts || []).find((w) => w.status === 'pubblicato' && w.published && w.week_of === m); };
+export const workoutLinkHtml = (a) => { if (a.kind !== 'allenamento' || a.status !== 'attiva') return ''; const w = workoutForDate(a.date);
+  return w ? `<button class="alt sm" style="margin:6px 0" data-act="wOpen" data-id="${w.id}">Allenamento della settimana: ${esc(w.published.title)}</button>` : ''; };
+A.wOpen = (el) => { closeSheet(); W.mode = 'read'; W.id = el.dataset.id; A.go({ dataset: { view: 'work' } }); window.scrollTo(0, 0); };
 const dayY = (iso) => new Date(iso + 'T12:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
-const pubDate = (w) => (w.published_at || w.updated_at || '').slice(0, 10);
+const pubDate = (w) => w.week_of || (w.published_at || w.updated_at || '').slice(0, 10);
 // giorno dell'anno, per trovare le schede «di questo periodo» negli anni passati
 const doy = (iso) => { const d = new Date(iso.slice(0, 10) + 'T12:00'); return Math.floor((d - new Date(d.getFullYear(), 0, 1)) / 864e5); };
 const nearInYear = (iso, today, before = 7, after = 28) => { const x = (doy(iso) - doy(today) + 365) % 365; return x <= after || x >= 365 - before; };
 const plain = (w) => `${w.published?.title || w.title} ${w.published?.summary || ''} ${(w.published?.blocks || []).map((b) => `${b.title} ${b.body}`).join(' ')}`.toLowerCase();
 const pubCard = (w, old) => `<button class="card" style="width:100%;text-align:left;display:block;color:inherit;background:#fff" data-act="wRead" data-id="${w.id}">
-    <span class="pill ${old ? 'grey' : 'green'}">${old ? 'STORICO ' + seasonOf(pubDate(w)) : 'PUBBLICATA'}</span>${w.has_unpublished_changes && canWorkouts() ? ' <span class="pill gold">modifiche in bozza</span>' : ''}
+    <span class="pill ${old ? 'grey' : 'green'}">${old ? 'STORICO ' + seasonOf(pubDate(w)) : 'PUBBLICATA'}</span>${!old && w.week_of === mondayOf(todayISO()) ? ' <span class="pill gold">QUESTA SETTIMANA</span>' : ''}${w.has_unpublished_changes && canWorkouts() ? ' <span class="pill gold">modifiche in bozza</span>' : ''}
     <h3>${esc(w.published?.title || w.title)}</h3>
     ${w.published?.summary ? `<p class="small">${esc(w.published.summary.split('\n').slice(-2).join(' · '))}</p>` : ''}
-    <p class="small">Pubblicata ${esc(dt(w.published_at))}${w.published_by ? ' da ' + esc(w.published_by) : ''}</p></button>`;
+    <p class="small">${w.week_of ? `<b>${esc(weekLabel(w.week_of))}</b> · ` : ''}Pubblicata ${esc(dt(w.published_at))}${w.published_by ? ' da ' + esc(w.published_by) : ''}</p></button>`;
 const histItem = (w) => `<button class="histitem" data-act="wRead" data-id="${w.id}" data-text="${esc(plain(w))}"><b>${esc(w.published?.title || w.title)}</b><span>${esc(dayY(pubDate(w)))}</span></button>`;
 
 function listView(main) {
   const all = S.workouts || [];
   const today = todayISO(), cur = seasonOf(today);
   const pubAll = all.filter((w) => w.status === 'pubblicato' && w.published);
-  const pub = pubAll.filter((w) => seasonOf(pubDate(w)) === cur);
+  const pub = pubAll.filter((w) => seasonOf(pubDate(w)) === cur).sort((x, y) => pubDate(y).localeCompare(pubDate(x)));
   const old = pubAll.filter((w) => seasonOf(pubDate(w)) !== cur);
   const drafts = all.filter((w) => w.status !== 'pubblicato');
   const ideas = canWorkouts() ? old.filter((w) => nearInYear(pubDate(w), today)).sort((x, y) => pubDate(y).localeCompare(pubDate(x))).slice(0, 8) : [];
@@ -89,6 +103,7 @@ A.wReuse = async (el) => {
     const id = await rpc('create_workout', { p_title: title.trim().slice(0, 120) });
     await rpc('save_workout_version', { p_workout: id, p_base: null, p_title: title.trim().slice(0, 120), p_summary: w.published.summary || null,
       p_blocks: (w.published.blocks || []).map((b) => ({ title: b.title || '', body: b.body || '', uncertain: false, note: '' })), p_source: null });
+    await rpc('set_workout_week', { p_workout: id, p_week: suggestWeek() });
     return id;
   }, 'Nuova bozza creata dalla scheda scelta: adattala e poi approvala', { button: el });
   if (id) openReview(id);
@@ -100,7 +115,7 @@ function readView(main) {
   if (!w || !w.published) { W.mode = 'list'; return listView(main); }
   const v = w.published;
   main.innerHTML = `<button class="ghost" data-act="wList">← Tutti gli allenamenti</button>
-    <div class="card"><span class="pill green">SCHEDA APPROVATA</span>${seasonOf((w.published_at || '').slice(0, 10) || todayISO()) !== seasonOf(todayISO()) ? ` <span class="pill grey">STORICO ${esc(seasonOf(w.published_at.slice(0, 10)))}</span>` : ''}<h2>${esc(v.title)}</h2>${blocksHtml(v)}
+    <div class="card"><span class="pill green">SCHEDA APPROVATA</span>${seasonOf((w.published_at || '').slice(0, 10) || todayISO()) !== seasonOf(todayISO()) ? ` <span class="pill grey">STORICO ${esc(seasonOf(w.published_at.slice(0, 10)))}</span>` : ''}<h2>${esc(v.title)}</h2>${w.week_of ? `<p><b>${esc(weekLabel(w.week_of)[0].toUpperCase() + weekLabel(w.week_of).slice(1))}</b></p>` : ''}${blocksHtml(v)}
       <p class="small">Scheda di consultazione approvata da ${esc(w.published_by || 'Fabio/Mario')} il ${esc(dt(w.published_at))}. Attenersi alle indicazioni tecniche e alle procedure di sicurezza stabilite dagli istruttori.</p></div>
     <div class="row"><button data-act="wPrint" data-id="${w.id}">Stampa / Salva PDF</button>
       </div>
@@ -161,7 +176,8 @@ A.pdfPicked = async (el) => {
       W.upload.items = [{ title: file.name.replace(/\.pdf$/i, ''), summary: '', blocks: [], source_text: '', header: '', pick: true, scanned: true }];
     } else {
       const items = parseWorkouts(lines, file.name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' '));
-      W.upload.items = items.map((x) => ({ ...x, pick: true }));
+      const have = new Set((S.workouts || []).filter((w) => seasonOf(pubDate(w)) === seasonOf(todayISO())).map((w) => normT(w.published?.title || w.title)));
+      W.upload.items = items.map((x) => ({ ...x, pick: !have.has(normT(x.title)), present: have.has(normT(x.title)) }));
       W.upload.status = `Testo letto da ${pages} pagina/e. Ho trovato ${items.length} scheda/e. Scegli quali preparare: verranno create come BOZZE private.`;
     }
   } catch (e) {
@@ -177,14 +193,31 @@ function uploadView(main) {
     <div class="card"><p role="status">${esc(u.status)}</p>${u.error ? `<div class="error">${esc(u.error)}</div>` : ''}
     ${u.items ? u.items.map((x, i) => {
       const chk = x.scanned ? null : integrity(x.source_text, x);
-      return `<div class="item"><label class="check"><input type="checkbox" data-change="upPick" data-i="${i}" ${x.pick ? 'checked' : ''}> <span><b>${esc(x.title)}</b><br>
+      return `<div class="item"><label class="check"><input type="checkbox" data-change="upPick" data-i="${i}" ${x.pick ? 'checked' : ''}> <span><b>${esc(x.title)}</b>${x.present ? ' <span class="pill grey">già nell\'app</span>' : ''}<br>
         <span class="small">${x.blocks.length} blocchi proposti · ${x.blocks.filter((b) => b.uncertain).length} da verificare${chk ? (chk.ok ? ' · ✓ tutte le parole e i numeri del PDF sono presenti' : ' · ⚠︎ differenze da controllare') : ''}</span></span></label></div>`;
-    }).join('') + `<button style="width:100%;margin-top:10px" data-act="upCreate">Crea le bozze e archivia il PDF originale</button>
+    }).join('') + `<label for="upWeek" style="margin-top:12px">La prima scheda selezionata vale dalla settimana del</label>
+      <input type="date" id="upWeek" value="${esc(suggestWeek())}">
+      <p class="small">Le altre schede selezionate prendono le settimane successive, in ordine. Puoi cambiare la settimana di ogni scheda anche dopo, in revisione.</p>
+      <label class="check"><input type="checkbox" id="upArchive"> <span><b>Allenamenti di una stagione passata, già svolti:</b> archiviali direttamente nello storico, senza rivederli uno per uno. Possibile solo se per tutte le schede selezionate parole e numeri del PDF sono presenti.</span></label>
+      <button style="width:100%;margin-top:10px" data-act="upCreate">Crea le bozze e archivia il PDF originale</button>
       <p class="small">Il PDF originale viene conservato in un archivio privato, visibile solo a Fabio e Mario. Le bozze non sono visibili allo staff.</p>` : '<p class="muted">Attendere…</p>'}</div>`;
+}
+// Settimana proposta: quella dopo l'ultima scheda con settimana, altrimenti la settimana in corso
+function suggestWeek() {
+  const weeks = (S.workouts || []).map((w) => w.week_of).filter(Boolean).sort();
+  const next = weeks.length ? addDays(weeks[weeks.length - 1], 7) : mondayOf(todayISO());
+  return next < mondayOf(todayISO()) ? mondayOf(todayISO()) : next;
 }
 A.upPick = (el) => { W.upload.items[+el.dataset.i].pick = el.checked; };
 A.upCreate = async (el) => {
   const items = W.upload.items.filter((x) => x.pick);
+  const firstWeek = $('upWeek')?.value ? mondayOf($('upWeek').value) : null;
+  const archive = !!$('upArchive')?.checked;
+  if (archive) {
+    if (!firstWeek || seasonOf(firstWeek) === seasonOf(todayISO())) return toast('L\'archiviazione diretta è solo per stagioni passate: scegli una settimana di una stagione precedente', true);
+    if (items.some((x) => x.scanned || !integrity(x.source_text, x).ok)) return toast('Alcune schede hanno differenze rispetto al PDF: togli la spunta e rivedile una per una', true);
+    if (!confirm(`Archiviare ${items.length} schede nello storico della stagione ${seasonOf(firstWeek)}? Saranno consultabili dallo staff come storico.`)) return;
+  }
   if (!items.length) return toast('Seleziona almeno una scheda', true);
   el.disabled = true; el.textContent = 'Salvataggio in corso…';
   const created = [];
@@ -194,12 +227,15 @@ A.upCreate = async (el) => {
       const path = `workouts/${id}/${Date.now()}-${W.upload.file.name.replace(/[^a-z0-9.]+/gi, '_').replace(/\.pdf$/i, '').slice(0, 60)}.pdf`;
       await uploadPdf(CONFIG.pdfBucket, path, W.upload.file);
       await rpc('register_workout_file', { p_workout: id, p_path: path, p_filename: W.upload.file.name, p_size: W.upload.file.size });
-      await rpc('save_workout_version', { p_workout: id, p_base: null, p_title: x.title.slice(0, 120), p_summary: x.summary || null,
+      const ver = await rpc('save_workout_version', { p_workout: id, p_base: null, p_title: x.title.slice(0, 120), p_summary: x.summary || null,
         p_blocks: x.blocks, p_source: x.source_text || null });
+      if (archive) await rpc('publish_workout', { p_workout: id, p_version: ver, p_reviewed: true });
+      if (firstWeek) await rpc('set_workout_week', { p_workout: id, p_week: addDays(firstWeek, 7 * created.length) });
       created.push(id);
     }
   }, null, { button: el });
-  if (ok) { toast(`${created.length} bozza/e create. Ora rivedile una per una.`); W.upload = null; openReview(created[0]); }
+  if (ok && archive) { toast(`${created.length} schede archiviate nello storico ${seasonOf(firstWeek)}`); W.upload = null; W.mode = 'list'; R.render(); }
+  else if (ok) { toast(`${created.length} bozza/e create. Ora rivedile una per una.`); W.upload = null; openReview(created[0]); }
   else if (created.length) { toast(`Create ${created.length} bozze prima dell'errore: le trovi nell'elenco.`, true); W.mode = 'list'; R.render(); }
   else { el.textContent = 'Riprova: crea le bozze'; }
 };
@@ -274,6 +310,10 @@ function reviewView(main) {
     <div class="alert small">Apnea: non modificare tempi, distanze, pause, ordine, assistenza o recuperi se non sei certo. In caso di dubbio lascia il blocco «da verificare» e chiedi a Fabio/Mario.</div>
     <div class="tabs" role="tablist"><button class="${W.tab === 'originale' ? 'active' : 'alt'}" data-act="tab" data-t="originale">Originale</button><button class="${W.tab === 'scheda' ? 'active' : 'alt'}" data-act="tab" data-t="scheda">Scheda</button></div>
     <div class="review" id="reviewGrid">${matchMedia('(min-width:900px)').matches ? sourcePanel + editPanel : (W.tab === 'originale' ? sourcePanel : editPanel)}</div>
+    <div class="card"><h3>Settimana in cui si usa</h3>
+      <p class="small">La scheda vale per tutte le serate della settimana, dal lunedì alla domenica. Scegli un giorno qualsiasi della settimana.</p>
+      <input type="date" id="wWeek" value="${esc(wk.week_of || '')}" data-change="wWeek" aria-label="Settimana della scheda">
+      <p class="small">${wk.week_of ? `<b>${esc(weekLabel(wk.week_of))}</b> <button class="ghost sm" data-act="wWeekClear">Togli</button>` : 'Nessuna settimana indicata.'}</p></div>
     <div class="card"><h3>Salva e pubblica</h3>
       <button style="width:100%" id="saveBtn" data-act="wSave" ${W.dirty ? '' : 'disabled'}>Salva bozza (nuova versione)</button>
       <label class="check"><input type="checkbox" id="pubCheck"> <span>Ho confrontato la scheda con il PDF originale: distanze, tempi, recuperi, ordine e indicazioni di sicurezza sono corretti.</span></label>
@@ -328,11 +368,15 @@ A.wSave = (el) => act(async () => {
   const d = await rpc('app_workout_detail', { p_workout: W.id }); W.detail = d; W.edit.base = d.workout.current_version_id;
 }, 'Bozza salvata: visibile solo a Fabio e Mario', { button: el });
 
+const setWeek = (week) => act(() => rpc('set_workout_week', { p_workout: W.id, p_week: week }), week ? `Scheda valida per la ${weekLabel(week)}` : 'Settimana tolta')
+  .then((ok) => { if (ok !== false) { W.detail.workout.week_of = week; rerender(); } });
+A.wWeek = (el) => { if (el.value) setWeek(mondayOf(el.value)); };
+A.wWeekClear = () => setWeek(null);
 A.wPublish = (el) => {
   if (!$('pubCheck').checked) return toast('Conferma di aver controllato la scheda rispetto all\'originale', true);
   if (!confirm('Pubblicare questa scheda? Tutto lo staff potrà leggerla e stamparla.')) return;
   act(() => rpc('publish_workout', { p_workout: W.id, p_version: W.detail.workout.current_version_id, p_reviewed: true }),
-    'Scheda pubblicata allo staff', { button: el }).then((ok) => { if (ok) { W.mode = 'read'; R.render(); } });
+    'Scheda pubblicata allo staff', { button: el }).then((ok) => { if (ok && W.mode === 'review') { W.mode = 'read'; R.render(); } });
 };
 
 A.wLoadVersion = async (el) => {

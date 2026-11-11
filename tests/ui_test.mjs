@@ -118,6 +118,18 @@ try {
   await fabio.page.check('#pubCheck'); await fabio.page.click('#pubBtn');
   await fabio.page.waitForSelector('text=SCHEDA APPROVATA'); await shot(fabio, '15-scheda-pubblicata');
   ok(true, 'Fabio approva e pubblica');
+  ok(await fabio.page.isVisible('text=Settimana dal'), 'Scheda pubblicata: indica la settimana in cui si usa');
+  // stesso PDF ricaricato (con le settimane nuove in fondo): le schede già presenti non vengono riproposte
+  await fabio.page.goto(APP + '#work'); await fabio.page.reload(); await fabio.page.waitForSelector('h3:has-text("Schede di questa stagione")');
+  await fabio.page.setInputFiles('#pdfInput', PDF); await fabio.page.waitForSelector('text=Ho trovato', { timeout: 30000 });
+  ok(await fabio.page.locator('.item:has-text("già nell\'app") input[data-change="upPick"]:not(:checked)').count() === 1, 'PDF ricaricato: scheda già presente riconosciuta e non selezionata');
+  // PDF di una stagione passata: archiviazione diretta nello storico, con le settimane in ordine
+  const allBoxes = fabio.page.locator('input[data-change="upPick"]'); for (let i = 0; i < await allBoxes.count(); i++) await allBoxes.nth(i).check();
+  await fabio.page.fill('#upWeek', '2025-10-15'); await fabio.page.check('#upArchive');
+  await fabio.page.click('text=Crea le bozze'); await fabio.page.waitForSelector('#toast:has-text("archiviate nello storico 2025/26")', { timeout: 20000 });
+  ok(await fabio.page.isVisible('summary:has-text("Stagione 2025/26 · 5 schede")'), 'Stagione passata archiviata direttamente nello storico');
+  await fabio.page.click('summary:has-text("Stagione 2025/26")');
+  ok((await fabio.page.locator('.histitem').first().textContent()).includes('13 ott 2025'), 'Storico: settimane assegnate in ordine dal lunedì scelto');
 
   // ---------- 4. Altro istruttore: legge, stampa, apre il PDF originale ----------
   const i2 = await device('istruttore2-android', 'Pixel 5');
@@ -125,6 +137,7 @@ try {
   await i2.page.waitForSelector('text=Scegli la tua password'); ok(true, 'Primo accesso: cambio password obbligatorio');
   await i2.page.fill('#pw1', 'NuovaPass-2026'); await i2.page.fill('#pw2', 'NuovaPass-2026'); await i2.page.click('button:has-text("Salva password")');
   await i2.page.waitForSelector('.tour'); await i2.page.click('text=Salta la guida');
+  await i2.page.waitForSelector('text=QUESTA SETTIMANA'); ok(true, 'Prima pagina: allenamento di questa settimana');
   await nav(i2, 'Allenamenti'); await i2.page.waitForSelector('text=PUBBLICATA');
   ok(!(await i2.page.isVisible('text=Carica PDF')), 'Istruttore: niente caricamento PDF');
   await i2.page.click('button.card:has-text("Settimana 1")'); await i2.page.waitForSelector('text=SCHEDA APPROVATA');

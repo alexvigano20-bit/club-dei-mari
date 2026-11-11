@@ -6,7 +6,7 @@ import {
   addMonths, hhmm, dt, KIND, activityLabel, isAdmin, canWorkouts, canAttendance, staffName, activeStaff,
   myAssignments, responseOf, openRequests, printHtml, printHeader, openSheet, closeSheet, sheetOpen, defaultRange,
 } from './core.js';
-import { renderWork } from './workouts.js';
+import { renderWork, thisWeekWorkouts, workoutLinkHtml, weekLabel } from './workouts.js';
 import { iconMine, iconWork, iconCal, iconNotices, NAV_ICONS } from './icons.js';
 import { renderAvail, homeAvailBanner } from './availability.js';
 import { renderAdmin, renderAttendance, renderPlan, dayAdminHtml, replacementForm } from './admin.js';
@@ -183,6 +183,8 @@ function renderHome(main) {
       <button class="tile" data-act="go" data-view="calendar"><span class="ico">${iconCal()}</span>Calendario</button>
       <button class="tile" data-act="go" data-view="notices"><span class="ico">${iconNotices()}</span>Comunicazioni${open ? `<span class="count">${open} sostituzione/i</span>` : ''}</button>
     </div>
+    ${thisWeekWorkouts().map((w) => `<div class="card"><span class="pill gold">QUESTA SETTIMANA</span><h3>Allenamento: ${esc(w.published.title)}</h3>
+      <p class="small">Vale per tutte le serate della ${esc(weekLabel(w.week_of))}.</p><button style="width:100%" data-act="wOpen" data-id="${w.id}">Apri la scheda</button></div>`).join('')}
     ${homeAvailBanner()}
     <div class="card"><h3>Il tuo prossimo turno</h3>
       ${next.length ? next.map(({ activity: a, assignment: s }) => `<div class="item"><span class="tag">${esc(KIND[a.kind])}</span>
@@ -220,6 +222,7 @@ function shiftCard({ activity: a, assignment: s }, withButtons) {
     ${a.title || a.start_time ? `<p class="muted">${esc([a.title, a.start_time && 'ore ' + hhmm(a.start_time) + (a.end_time ? '–' + hhmm(a.end_time) : '')].filter(Boolean).join(' · '))}</p>` : ''}
     <p class="muted">Con te: ${esc(others.join(', ') || 'nessun altro assegnato')}</p>
     ${a.notes ? `<p class="small">${esc(a.notes)}</p>` : ''}
+    ${workoutLinkHtml(a)}
     ${respStatus(s.id)}
     ${att ? `<p class="small">Registro presenze: <b>${att === 'presente' ? 'presente ✓' : 'assente'}</b></p>` : ''}
     ${req ? '<div class="alert">Richiesta di sostituzione inviata a Mario. Solo lui può modificare il turno.</div>' : ''}
@@ -323,6 +326,7 @@ export function openDay(date) {
         ${a.title || a.start_time ? `<h3>${esc([a.title, a.start_time && 'ore ' + hhmm(a.start_time) + (a.end_time ? '–' + hhmm(a.end_time) : '')].filter(Boolean).join(' · '))}</h3>` : ''}
         <p><b>Staff:</b> ${esc(a.assignments.map((s) => staffName(s.profile_id)).join(' · ') || 'da assegnare')}</p>
         ${a.notes ? `<p class="small">${esc(a.notes)}</p>` : ''}
+        ${workoutLinkHtml(a)}
         ${mine && a.status === 'attiva' ? `<p><b>Il tuo turno</b></p>${respStatus(mine.id)}${date >= t ? respondButtons(mine.id) : ''}` : ''}
         ${isAdmin() ? dayAdminHtml(a) : ''}
       </div>`;
@@ -387,10 +391,10 @@ const tourSteps = () => [
   ['I tuoi turni', 'Mario assegna i turni. Su ogni tuo turno puoi toccare «Ci sono» o «Non ci sono». Non puoi assegnarti turni da solo né spostarli.'],
   ['Conferma e presenza sono diverse', 'Rispondere nell\'app non è la presenza ufficiale, e non rispondere non vuol dire essere assenti. Il registro cartaceo in piscina resta valido.'],
   ['Sostituzioni', '«Non ci sono» invia una richiesta a Mario, che sceglie il sostituto (anche concordandolo su WhatsApp).'],
-  ['Allenamenti', 'Le schede pubblicate da Fabio e Mario si leggono, si stampano e si salvano in PDF. I contenuti tecnici non vanno modificati. Le schede delle stagioni passate restano nello «Storico allenamenti», dove puoi anche cercare per parola.'],
+  ['Allenamenti', 'In prima pagina trovi l'allenamento di questa settimana, uguale per tutte le serate. Le schede pubblicate da Fabio e Mario si leggono, si stampano e si salvano in PDF. I contenuti tecnici non vanno modificati. Le schede delle stagioni passate restano nello «Storico allenamenti», dove puoi anche cercare per parola.'],
   ...(isAdmin() ? [['Pianifica turni', 'Dalla pagina iniziale apri «Pianifica turni». La prima volta imposti la stagione: da che giorno a che giorno, in che giorni e a che ora ci sono allenamenti e corsi. Poi, mese per mese, assegni chi segue ogni serata, anche «a tutti i mercoledì» con un tocco.'], ['Gestione Club', 'Staff e accessi, sostituzioni, registro presenze, esportazioni.']] : []),
   ...(isAdmin() ? [['Disponibilità dello staff', 'In «Pianifica turni», dopo aver impostato la stagione, scegli tra «Per singola serata» e «Calendario del mese»: una tabella con lo staff sulle righe e le serate sulle colonne, dove vedi chi è disponibile (sì / no) e assegni o togli con un tocco. Se qualcuno non ha ancora dichiarato le disponibilità, in Gestione Club trovi l\'elenco e il promemoria già scritto da mandare su WhatsApp. L\'app ti avvisa se assegni chi ha detto di non esserci o chi ha allenato il mese prima (mese di scarico, indicazione di buon senso).']] : []),
-  ...(canWorkouts() ? [['Caricare un allenamento', 'In «Allenamenti» tocca «Carica PDF». L\'app propone le schede: confrontale con l\'originale, correggi e solo dopo tocca «Approva e pubblica». Tutte le schede restano nello storico: in «Idee dagli anni scorsi» trovi quelle dello stesso periodo delle stagioni passate e con «Riusa» le trasformi in una nuova bozza da adattare.']] : []),
+  ...(canWorkouts() ? [['Caricare un allenamento', 'In «Allenamenti» tocca «Carica PDF». L\'app propone le schede: confrontale con l\'originale, correggi e solo dopo tocca «Approva e pubblica». Ogni scheda vale per una settimana, dal lunedì alla domenica. Tutte le schede restano nello storico: in «Idee dagli anni scorsi» trovi quelle dello stesso periodo delle stagioni passate e con «Riusa» le trasformi in una nuova bozza da adattare.']] : []),
   ['Stampa', 'In Turni, Calendario e Allenamenti trovi «Stampa / Salva PDF»: sul telefono scegli «Salva come PDF» nel menu di stampa.'],
   ['Privacy', 'L\'app conserva solo nome, email, turni, risposte e presenze. Gli altri vedono nome, turni e sostituzioni da organizzare; email, risposte e presenze di tutti solo il responsabile. Dati su server UE; presenze cancellate dopo 12 mesi. Per vedere, correggere o cancellare i tuoi dati: info@clubdeimari.com.'],
 ];

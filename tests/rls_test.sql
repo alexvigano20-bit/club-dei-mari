@@ -128,12 +128,17 @@ select set_config('request.jwt.claim.sub', :'i1', false);
 select test.ok(test.rows('select 1 from public.workouts') = 0, 'Istruttore: non vede le bozze');
 select test.ok(test.rows('select 1 from public.workout_versions') = 0, 'Istruttore: non vede versioni non pubblicate');
 select test.fails($$select public.create_workout('x')$$, 'Istruttore: NON crea allenamenti');
+select test.fails($$select public.set_workout_week((select id from w), date '2026-11-09')$$, 'Istruttore: NON assegna la settimana a una scheda');
 select test.fails($$insert into storage.objects(bucket_id, name) values ('workout-pdfs', 'workouts/' || (select id from w) || '/hack.pdf')$$, 'Istruttore: NON carica PDF');
 select test.ok(test.rows($$select 1 from storage.objects where bucket_id='workout-pdfs'$$) = 0, 'Istruttore: PDF di bozza non accessibile');
 
 select set_config('request.jwt.claim.sub', :'fabio', false);
 select test.fails($$select public.publish_workout((select id from w), (select current_version_id from public.workouts where id=(select id from w)), false)$$, 'Pubblicazione senza revisione confermata rifiutata');
 select public.publish_workout((select id from w), (select current_version_id from public.workouts where id=(select id from w)), true, false);
+select test.fails($$select public.set_workout_week((select id from w), date '2026-11-10')$$, 'Settimana: deve iniziare di lunedì');
+select public.set_workout_week((select id from w), date '2026-11-09');
+select test.ok((select week_of from public.workouts where id=(select id from w)) = date '2026-11-09', 'Fabio: settimana della scheda salvata');
+select test.ok((select bool_or((x->>'week_of') = '2026-11-09') from jsonb_array_elements(public.app_workouts()) x), 'Elenco allenamenti: settimana inclusa');
 -- nuova bozza dopo la pubblicazione: lo staff continua a vedere la versione approvata
 select public.save_workout_version((select id from w), (select current_version_id from public.workouts where id=(select id from w)), 'Novembre – Settimana 1', 'bozza', '[]'::jsonb, null);
 
