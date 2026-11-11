@@ -2,7 +2,7 @@
 // revisione affiancata, versioni e pubblicazione per Fabio e Mario.
 import { CONFIG } from './config.js';
 import { rpc, uploadPdf, signedUrl } from './api.js';
-import { $, esc, S, R, A, act, toast, loadState, canWorkouts, dt, printHtml, printHeader, download } from './core.js';
+import { $, esc, S, R, A, act, toast, loadState, canWorkouts, dt, printHtml, printHeader, download, todayISO } from './core.js';
 import { parseWorkouts, linesFromTextContent, integrity } from './workout-parse.js';
 
 const MAX_PDF = 10 * 1024 * 1024;
@@ -22,10 +22,30 @@ const blocksHtml = (v) => `${v.summary ? `<p class="summary">${esc(v.summary)}</
   `<div class="workblock">${b.title ? `<b>${esc(b.title)}</b>` : ''}${b.body ? `<div class="body">${esc(b.body)}</div>` : ''}</div>`).join('')}`;
 
 // ---------------- ELENCO ----------------
+// Stagione sportiva da settembre ad agosto: «2026/27»
+export const seasonOf = (iso) => { const y = +iso.slice(0, 4), m = +iso.slice(5, 7); const s = m >= 9 ? y : y - 1; return `${s}/${String(s + 1).slice(2)}`; };
+const dayY = (iso) => new Date(iso + 'T12:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
+const pubDate = (w) => (w.published_at || w.updated_at || '').slice(0, 10);
+// giorno dell'anno, per trovare le schede «di questo periodo» negli anni passati
+const doy = (iso) => { const d = new Date(iso.slice(0, 10) + 'T12:00'); return Math.floor((d - new Date(d.getFullYear(), 0, 1)) / 864e5); };
+const nearInYear = (iso, today, before = 7, after = 28) => { const x = (doy(iso) - doy(today) + 365) % 365; return x <= after || x >= 365 - before; };
+const plain = (w) => `${w.published?.title || w.title} ${w.published?.summary || ''} ${(w.published?.blocks || []).map((b) => `${b.title} ${b.body}`).join(' ')}`.toLowerCase();
+const pubCard = (w, old) => `<button class="card" style="width:100%;text-align:left;display:block;color:inherit;background:#fff" data-act="wRead" data-id="${w.id}">
+    <span class="pill ${old ? 'grey' : 'green'}">${old ? 'STORICO ' + seasonOf(pubDate(w)) : 'PUBBLICATA'}</span>${w.has_unpublished_changes && canWorkouts() ? ' <span class="pill gold">modifiche in bozza</span>' : ''}
+    <h3>${esc(w.published?.title || w.title)}</h3>
+    ${w.published?.summary ? `<p class="small">${esc(w.published.summary.split('\n').slice(-2).join(' · '))}</p>` : ''}
+    <p class="small">Pubblicata ${esc(dt(w.published_at))}${w.published_by ? ' da ' + esc(w.published_by) : ''}</p></button>`;
+const histItem = (w) => `<button class="histitem" data-act="wRead" data-id="${w.id}" data-text="${esc(plain(w))}"><b>${esc(w.published?.title || w.title)}</b><span>${esc(dayY(pubDate(w)))}</span></button>`;
+
 function listView(main) {
   const all = S.workouts || [];
-  const pub = all.filter((w) => w.status === 'pubblicato');
+  const today = todayISO(), cur = seasonOf(today);
+  const pubAll = all.filter((w) => w.status === 'pubblicato' && w.published);
+  const pub = pubAll.filter((w) => seasonOf(pubDate(w)) === cur);
+  const old = pubAll.filter((w) => seasonOf(pubDate(w)) !== cur);
   const drafts = all.filter((w) => w.status !== 'pubblicato');
+  const ideas = canWorkouts() ? old.filter((w) => nearInYear(pubDate(w), today)).sort((x, y) => pubDate(y).localeCompare(pubDate(x))).slice(0, 8) : [];
+  const seasons = [...new Set(old.map((w) => seasonOf(pubDate(w))))].sort().reverse();
   main.innerHTML = `<h2>Allenamenti</h2>
     ${canWorkouts() ? `<div class="card soft"><span class="pill">SOLO FABIO E MARIO</span>
       <h3>Carica il PDF dell'allenamento</h3>
@@ -33,18 +53,46 @@ function listView(main) {
       <label class="btn" for="pdfInput" style="width:100%;font-size:18px">Carica PDF</label>
       <input id="pdfInput" type="file" accept="application/pdf,.pdf" class="hidden" data-change="pdfPicked">
       <button class="ghost" style="width:100%" data-act="newBlank">oppure crea una scheda scrivendo il testo</button></div>` : ''}
-    <h3>Schede pubblicate</h3>
-    ${pub.length ? pub.map((w) => `<button class="card" style="width:100%;text-align:left;display:block;color:inherit;background:#fff" data-act="wRead" data-id="${w.id}">
-        <span class="pill green">PUBBLICATA</span>${w.has_unpublished_changes && canWorkouts() ? ' <span class="pill gold">modifiche in bozza</span>' : ''}
-        <h3>${esc(w.published?.title || w.title)}</h3>
-        ${w.published?.summary ? `<p class="small">${esc(w.published.summary.split('\n').slice(-2).join(' · '))}</p>` : ''}
-        <p class="small">Pubblicata ${esc(dt(w.published_at))}${w.published_by ? ' da ' + esc(w.published_by) : ''}</p></button>`).join('')
-      : '<div class="card muted">Nessuna scheda pubblicata per ora.</div>'}
+    ${ideas.length ? `<div class="card"><span class="pill">SOLO FABIO E MARIO</span><h3>Idee dagli anni scorsi</h3>
+      <p class="small">Schede pubblicate in questo periodo nelle stagioni passate. «Riusa» crea una nuova bozza da adattare: nulla viene pubblicato senza la tua approvazione.</p>
+      ${ideas.map((w) => `<div class="checkline"><span class="who"><b>${esc(w.published.title)}</b><br><span class="small">Stagione ${esc(seasonOf(pubDate(w)))} · ${esc(dayY(pubDate(w)))}</span></span>
+        <button class="ghost sm" data-act="wRead" data-id="${w.id}">Leggi</button><button class="alt sm" data-act="wReuse" data-id="${w.id}">Riusa</button></div>`).join('')}</div>` : ''}
+    <h3>Schede di questa stagione (${esc(cur)})</h3>
+    ${pub.length ? pub.map((w) => pubCard(w, false)).join('') : '<div class="card muted">Nessuna scheda pubblicata in questa stagione per ora.</div>'}
+    ${pubAll.length ? `<div class="card"><h3>Storico allenamenti</h3>
+      <p class="small">Tutte le schede approvate restano qui, stagione per stagione. Cerca per parola (es. «statica», «tabelle CO2», «settimana 1»).</p>
+      <input id="wSearch" type="search" placeholder="Cerca negli allenamenti…" aria-label="Cerca negli allenamenti" autocomplete="off">
+      <div id="wResults" class="hidden"></div>
+      <div id="wSeasons">${seasons.length ? seasons.map((sn, i) => { const list = old.filter((w) => seasonOf(pubDate(w)) === sn).sort((x, y) => pubDate(x).localeCompare(pubDate(y)));
+        return `<details><summary>Stagione ${esc(sn)} · ${list.length} ${list.length === 1 ? "scheda" : "schede"}</summary><div class="histlist">${list.map(histItem).join('')}</div></details>`; }).join('')
+        : '<p class="small">Le stagioni passate compariranno qui da settembre: le schede di quest\'anno diventeranno lo storico.</p>'}</div></div>` : ''}
     ${canWorkouts() && drafts.length ? `<h3>Bozze e schede ritirate</h3>${drafts.map((w) => `<div class="card"><span class="pill ${w.status === 'bozza' ? 'gold' : 'grey'}">${w.status === 'bozza' ? 'BOZZA PRIVATA' : 'RITIRATA'}</span>
         <h3>${esc(w.title)}</h3><p class="small">Ultima modifica ${esc(dt(w.updated_at))}</p>
         <button class="alt" style="width:100%" data-act="wReview" data-id="${w.id}">Rivedi e pubblica</button></div>`).join('')}` : ''}
     <button class="alt" style="width:100%;margin-top:16px" data-act="go" data-view="home">⌂ Torna alla pagina iniziale</button>`;
+  const q = main.querySelector('#wSearch');
+  if (q) q.addEventListener('input', () => {
+    const t = q.value.trim().toLowerCase(), res = $('wResults');
+    $('wSeasons').classList.toggle('hidden', !!t); res.classList.toggle('hidden', !t);
+    if (!t) return;
+    const words = t.split(/\s+/);
+    const hits = pubAll.filter((w) => { const x = plain(w); return words.every((k) => x.includes(k)); }).sort((x, y) => pubDate(y).localeCompare(pubDate(x)));
+    res.innerHTML = hits.length ? `<p class="small">${hits.length} ${hits.length === 1 ? 'scheda trovata' : 'schede trovate'}</p><div class="histlist">${hits.slice(0, 50).map((w) => histItem(w).replace('</span></button>', ` · ${esc(seasonOf(pubDate(w)))}</span></button>`)).join('')}</div>` : '<p class="muted">Nessuna scheda trovata.</p>';
+  });
 }
+
+// Riusa una scheda (anche di anni passati) come nuova bozza: stesso contenuto, da adattare e approvare
+A.wReuse = async (el) => {
+  const w = (S.workouts || []).find((x) => x.id === el.dataset.id); if (!w?.published) return;
+  const title = prompt('Titolo della nuova bozza (puoi cambiarlo anche dopo)', w.published.title); if (!title?.trim()) return;
+  const id = await act(async () => {
+    const id = await rpc('create_workout', { p_title: title.trim().slice(0, 120) });
+    await rpc('save_workout_version', { p_workout: id, p_base: null, p_title: title.trim().slice(0, 120), p_summary: w.published.summary || null,
+      p_blocks: (w.published.blocks || []).map((b) => ({ title: b.title || '', body: b.body || '', uncertain: false, note: '' })), p_source: null });
+    return id;
+  }, 'Nuova bozza creata dalla scheda scelta: adattala e poi approvala', { button: el });
+  if (id) openReview(id);
+};
 
 // ---------------- LETTURA ----------------
 function readView(main) {
@@ -52,11 +100,12 @@ function readView(main) {
   if (!w || !w.published) { W.mode = 'list'; return listView(main); }
   const v = w.published;
   main.innerHTML = `<button class="ghost" data-act="wList">← Tutti gli allenamenti</button>
-    <div class="card"><span class="pill green">SCHEDA APPROVATA</span><h2>${esc(v.title)}</h2>${blocksHtml(v)}
+    <div class="card"><span class="pill green">SCHEDA APPROVATA</span>${seasonOf((w.published_at || '').slice(0, 10) || todayISO()) !== seasonOf(todayISO()) ? ` <span class="pill grey">STORICO ${esc(seasonOf(w.published_at.slice(0, 10)))}</span>` : ''}<h2>${esc(v.title)}</h2>${blocksHtml(v)}
       <p class="small">Scheda di consultazione approvata da ${esc(w.published_by || 'Fabio/Mario')} il ${esc(dt(w.published_at))}. Attenersi alle indicazioni tecniche e alle procedure di sicurezza stabilite dagli istruttori.</p></div>
     <div class="row"><button data-act="wPrint" data-id="${w.id}">Stampa / Salva PDF</button>
       </div>
-    ${canWorkouts() ? `<div class="row" style="margin-top:8px"><button class="alt" data-act="wReview" data-id="${w.id}">✎ Modifica (nuova bozza)</button>
+    ${canWorkouts() ? `<div class="row" style="margin-top:8px"><button class="alt" data-act="wReuse" data-id="${w.id}">Riusa come nuova bozza</button></div>
+      <div class="row" style="margin-top:8px"><button class="alt" data-act="wReview" data-id="${w.id}">✎ Modifica (nuova bozza)</button>
       <button class="warn" data-act="wUnpublish" data-id="${w.id}">Ritira pubblicazione</button></div>` : ''}`;
 }
 

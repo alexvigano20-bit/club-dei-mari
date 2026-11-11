@@ -1,6 +1,7 @@
 // Test end-to-end dell'interfaccia (Chromium, profili iPhone e Android emulati)
 // contro l'API simulata + Postgres locale con le stesse regole RLS.
 // Prerequisiti: ./scripts/local-db-reset.sh, seed_ui.sql, node tests/mock-supabase.mjs
+import { execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync } from 'node:fs';
 const require = createRequire(import.meta.url);
@@ -138,6 +139,25 @@ try {
   ok(staffSign.status === 400, 'Staff: link al PDF originale rifiutato anche via API');
   const mgrSign = await fetch(`http://localhost:54321/storage/v1/object/sign/workout-pdfs/${pdfPath}`, { method: 'POST', headers: { Authorization: `Bearer ${await tokOf(fabio)}`, 'content-type': 'application/json' }, body: '{"expiresIn":60}' });
   ok(mgrSign.ok, 'Fabio: PDF originale consultabile tramite link firmato');
+
+  // ---------- 4a. Storico allenamenti: scheda della stagione scorsa, ricerca, riuso ----------
+  const oldW = '30000000-0000-0000-0000-000000000001', oldV = '30000000-0000-0000-0000-000000000002';
+  const sql = (q) => execSync(`psql -h /tmp -p 54329 -U postgres -d ${process.env.PGDATABASE || 'cdm_test'} -q -v ON_ERROR_STOP=1`, { input: q });
+  sql(`insert into public.workouts(id,title,status,published_at,created_at) values ('${oldW}','Novembre - Settimana 1 anno scorso','pubblicato', now()-interval '1 year', now()-interval '1 year');
+    insert into public.workout_versions(id,workout_id,version_no,title,blocks,approved_at) values ('${oldV}','${oldW}',1,'Novembre - Settimana 1 anno scorso',
+      '[{"title":"Statica","body":"Tabelle CO2: 8 x 1 min 30","uncertain":false,"note":""}]'::jsonb, now()-interval '1 year');
+    update public.workouts set published_version_id='${oldV}', current_version_id='${oldV}' where id='${oldW}';`);
+  await i2.page.reload(); await nav(i2, 'Allenamenti'); await i2.page.waitForSelector('text=Storico allenamenti');
+  ok(await i2.page.isVisible('summary:has-text("Stagione")'), 'Storico: stagioni passate raggruppate');
+  await i2.page.fill('#wSearch', 'tabelle co2'); await i2.page.waitForSelector('#wResults .histitem');
+  ok((await i2.page.locator('#wResults .histitem').count()) === 1, 'Storico: ricerca per parola nel contenuto');
+  await shot(i2, '28-storico-allenamenti');
+  ok(!(await i2.page.isVisible('text=Idee dagli anni scorsi')), 'Istruttore: niente «Idee» né «Riusa»');
+  await fabio.page.goto(APP + '#work'); await fabio.page.reload(); await fabio.page.waitForSelector('text=Idee dagli anni scorsi');
+  await shot(fabio, '29-idee-anni-scorsi');
+  await fabio.page.locator('.checkline:has-text("anno scorso") [data-act="wReuse"]').click();
+  await fabio.page.waitForSelector('#toast:has-text("Nuova bozza creata")');
+  ok(await fabio.page.locator('textarea').evaluateAll((xs) => xs.some((x) => x.value.includes('Tabelle CO2'))), 'Riusa: nuova bozza con il contenuto della scheda passata');
 
   // ---------- 4b. Mario pianifica i turni del mese ----------
   await mario.page.goto(APP + '#plan'); await mario.page.waitForSelector('h2:has-text("Pianifica turni")');
