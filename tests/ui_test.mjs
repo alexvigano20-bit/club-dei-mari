@@ -170,6 +170,7 @@ try {
   await shot(fabio, '29-idee-anni-scorsi');
   await fabio.page.locator('.checkline:has-text("anno scorso") [data-act="wReuse"]').click();
   await fabio.page.waitForSelector('#toast:has-text("Nuova bozza creata")');
+  await fabio.page.waitForFunction(() => [...document.querySelectorAll('textarea')].some((x) => x.value.includes('Tabelle CO2')), null, { timeout: 10000 }).catch(() => {});
   ok(await fabio.page.locator('textarea').evaluateAll((xs) => xs.some((x) => x.value.includes('Tabelle CO2'))), 'Riusa: nuova bozza con il contenuto della scheda passata');
 
   // ---------- 4b. Mario pianifica i turni del mese ----------
@@ -211,6 +212,12 @@ try {
   const corsoOpts = await mario.page.locator('select[data-change="planAdd"]').first().locator('option').allTextContents();
   ok(corsoOpts.some((o) => /Istruttore Prova Due — NON disponibile/.test(o)) || corsoOpts.every((o) => !o.includes('Istruttore Prova Due')), 'Menu «aggiungi»: indica chi non è disponibile', corsoOpts.join(' | ').slice(0, 160));
   await shot(mario, '25-pianifica-disponibilita');
+  // Registro di funzionamento: nessun pulsante nell'app, nemmeno per il responsabile
+  await mario.page.goto(APP + '#admin'); await mario.page.reload(); await mario.page.waitForSelector('text=Dati e sicurezza');
+  ok(!(await mario.page.isVisible('text=Controllo funzionamento')), 'Registro di funzionamento: non visibile nell\'app');
+  const logged = execSync(`psql -h /tmp -p 54329 -U postgres -d ${process.env.PGDATABASE || 'cdm_test'} -At -c "select count(*) filter (where kind='apertura') || ' ' || count(*) filter (where kind='sezione') from public.usage_events"`).toString().trim().split(' ').map(Number);
+  ok(logged[0] >= 2 && logged[1] >= 5, 'Registro di funzionamento: aperture e sezioni registrate nel database', `${logged[0]} aperture, ${logged[1]} sezioni`);
+  await mario.page.goto(APP + '#plan'); await mario.page.reload(); await mario.page.waitForSelector('h2:has-text("Pianifica turni")');
   // Promemoria a chi non ha dichiarato: messaggio WhatsApp pronto
   await mario.page.goto(APP + '#plan'); await mario.page.reload(); await mario.page.waitForSelector('h2:has-text("Pianifica turni")');
   await mario.page.click('[data-act="planMonth"][data-n="1"]'); await mario.page.waitForSelector('text=Disponibilità mancanti per');

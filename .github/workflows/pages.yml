@@ -1,7 +1,7 @@
 # Pubblica la cartella web/ su GitHub Pages a ogni modifica del ramo main.
 name: pubblica-app
 on:
-  push: { branches: [main], paths: ['web/**', '.github/workflows/pages.yml'] }
+  push: { branches: [main], paths: ['web/**', '.github/workflows/pages.yml', 'tests/syntax_check.sh', 'tests/version_test.mjs'] }
   workflow_dispatch: {}
 permissions: { contents: read, pages: write, id-token: write }
 concurrency: { group: pages, cancel-in-progress: true }
@@ -11,6 +11,8 @@ jobs:
     environment: { name: github-pages, url: '${{ steps.d.outputs.page_url }}' }
     steps:
       - uses: actions/checkout@v4
+      - name: Controllo sintassi e versione (blocca la pubblicazione se c'è un errore)
+        run: ./tests/syntax_check.sh
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with: { path: web }

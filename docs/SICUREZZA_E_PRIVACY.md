@@ -58,3 +58,14 @@ I dati di gestione (email, storico, registro presenze) e i PDF **non** vengono s
 - Nell'app c'è solo la chiave **pubblica** (anon/publishable): è prevista per i browser.
 - La `service_role` vive solo nella funzione server, che la riceve automaticamente da Supabase, e negli script di backup eseguiti da un computer fidato. Non va mai salvata nel repository.
 - La password del database e l'account Supabase vanno protetti con l'autenticazione a due fattori.
+
+
+## Registro di funzionamento (dal 12/11/2026)
+- Tabella `usage_events`: apertura dell'app, sezione aperta, errori tecnici, versione dell'app, tipo di dispositivo/browser (es. «iPhone Chrome»). Nessun contenuto inserito dagli utenti.
+- Scrittura solo tramite `log_usage` (utente attivo, max 30 eventi per invio, 600 al giorno). Lettura solo per gli sviluppatori, dal database (pannello Supabase o assistente): `select public.app_usage_report();` per il riepilogo, oppure la tabella `usage_events`. Nessun utente dell'app, nemmeno il responsabile, può leggerlo.
+- Cancellazione automatica dopo 90 giorni (pg_cron `cdm-purge-usage`). Indicato nell'informativa per lo staff.
+- Le modifiche ai dati restano tracciate separatamente in `audit_log`.
+
+## Aggiornamenti dell'app
+- `web/version.json`, `APP_VERSION` in `web/js/monitor.js` e la versione in `web/sw.js` devono coincidere (`tests/version_test.mjs`). Le app rimaste aperte controllano la versione quando tornano in primo piano e ogni 15 minuti: si aggiornano da sole se non si sta scrivendo, altrimenti mostrano «Aggiorna ora».
+- `tests/syntax_check.sh` blocca la pubblicazione se un modulo ha un errore di sintassi.

@@ -198,6 +198,18 @@ create temp table aw as select public.admin_assign_weekday('00000000-0000-0000-0
 select test.ok(not exists (select 1 from public.assignments s where s.profile_id = '00000000-0000-0000-0000-00000000000f' and s.removed_at is null and s.activity_id = (select ids[1] from av))
   and (select n from aw) >= 1,
   'Assegnazione rapida: salta le serate dichiarate «non ci sono»');
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', false);
+select public.log_usage((select jsonb_agg(jsonb_build_object('kind', case when g = 1 then 'apertura' else 'sezione' end, 'view', 'home', 'v', 'test')) from generate_series(1, 35) g));
+select public.log_usage('[{"kind":"errore","view":"work","detail":"prova errore"},{"kind":"inventato","detail":"x"}]'::jsonb);
+select test.fails($$select 1 from public.usage_events$$, 'Registro: lo staff non legge il registro (nemmeno il proprio)');
+select test.fails($$select public.app_usage_report()$$, 'Registro: lo staff non vede il riepilogo');
+select test.fails($$insert into public.usage_events(profile_id, kind) values ('00000000-0000-0000-0000-00000000000f', 'apertura')$$, 'Registro: scrittura diretta in tabella vietata');
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+select test.fails($$select 1 from public.usage_events$$, 'Registro: nemmeno il responsabile lo legge dall''app');
+select test.fails($$select public.app_usage_report()$$, 'Registro: riepilogo non accessibile al responsabile');
+reset role;
+select test.ok((select count(*) from public.usage_events where profile_id = '00000000-0000-0000-0000-0000000000a1') = 31, 'Registro: al massimo 30 eventi per invio, tipi sconosciuti scartati');
+select test.ok((select (x->>'errors_30')::int = 1 and x->>'last_open' is not null from jsonb_array_elements(public.app_usage_report()->'people') x where x->>'name' = (select display_name from public.profiles where id = '00000000-0000-0000-0000-0000000000a1')), 'Registro: riepilogo per gli sviluppatori dal database');
 reset role;
 do $$ begin raise exception 'RISULTATI % ok / % falliti || %', (select count(*) filter (where ok) from test.results), (select count(*) filter (where not ok) from test.results),
   coalesce((select string_agg(name || coalesce(' ['||detail||']',''), ' | ') from test.results where not ok), 'nessun fallimento'); end $$;

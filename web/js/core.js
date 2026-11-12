@@ -4,6 +4,9 @@ import { rpc, ApiError, forgetSession } from './api.js';
 export const $ = (id) => document.getElementById(id);
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// Collegamenti opzionali (impostati da app.js): es. registro degli errori
+export const hooks = { onActError: null };
+
 export const S = {
   me: null,            // profilo dal server (whoami)
   data: null,          // risultato di app_state
@@ -68,6 +71,7 @@ export async function act(fn, okMsg, { reload = true, button } = {}) {
     return r ?? true;
   } catch (e) {
     toast(e instanceof ApiError ? e.message : 'Errore imprevisto: ' + e.message, true);
+    try { hooks.onActError?.(`azione non riuscita: ${e?.message || e}`); } catch {}
     if (e?.status === 401) R.render();
     return false;
   } finally { if (button) button.disabled = false; }

@@ -53,3 +53,4 @@ Solo per avvisi da tenere fissi (es. «Piscina chiusa l'8 dicembre»): «＋ Agg
 
 ## Sicurezza dei dati
 Una volta al mese: Gestione Club → «Esporta tutti i dati» e salva il file in una cartella privata.
+

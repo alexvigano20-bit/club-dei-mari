@@ -4,8 +4,8 @@ import { signIn, signOut, changePassword, hasSession, sessionUserId, rpc, ApiErr
 import {
   $, esc, S, R, A, act, toast, loadState, readCache, wipeLocal, todayISO, iso, parseISO, human, humanShort, monthLabel,
   addMonths, hhmm, dt, KIND, activityLabel, isAdmin, canWorkouts, canAttendance, staffName, activeStaff,
-  myAssignments, responseOf, openRequests, printHtml, printHeader, openSheet, closeSheet, sheetOpen, defaultRange,
-} from './core.js';
+  myAssignments, responseOf, openRequests, printHtml, printHeader, openSheet, closeSheet, sheetOpen, defaultRange, hooks } from './core.js';
+import { startMonitor, track, trackError } from './monitor.js';
 import { renderWork, thisWeekWorkouts, workoutLinkHtml, weekLabel } from './workouts.js';
 import { iconMine, iconWork, iconCal, iconNotices, NAV_ICONS } from './icons.js';
 import { renderAvail, homeAvailBanner } from './availability.js';
@@ -19,6 +19,7 @@ let calMonthsBack = 0;
 async function boot() {
   registerSW();
   wireEvents();
+  startMonitor(); hooks.onActError = trackError;
   $('foot').textContent = CONFIG.environment === 'produzione' ? '' : `Ambiente: ${CONFIG.environment.toUpperCase()} — non inserire dati reali.`;
   if (!hasSession()) return renderLogin();
   try {
@@ -31,6 +32,7 @@ async function boot() {
     } else return handleAuthFailure(e);
   }
   if (S.me.must_change_password) return renderChangePassword(true);
+  track('apertura');
   route(location.hash.slice(1) || 'home', true);
   if (!localSeen('tour.v2')) go('tour');
 }
@@ -86,7 +88,7 @@ function renderLogin(message = '') {
       await signIn($('email').value, $('password').value);
       await loadState();
       if (S.me.must_change_password) return renderChangePassword(true);
-      route('home'); if (!localSeen('tour.v2')) go('tour');
+      track('apertura'); route('home'); if (!localSeen('tour.v2')) go('tour');
     } catch (err) {
       if (err.code === 'revoked') wipeLocal();
       $('loginErr').innerHTML = `<div class="error">${esc(err.message)}</div>`;
@@ -114,7 +116,7 @@ function renderChangePassword(first) {
     if (a !== b) return ($('pwErr').innerHTML = '<div class="error">Le due password non coincidono.</div>');
     try {
       await changePassword(a); await rpc('mark_password_changed'); await loadState();
-      toast('Password salvata'); route('home'); if (!localSeen('tour.v2')) go('tour');
+      toast('Password salvata'); track('apertura'); route('home'); if (!localSeen('tour.v2')) go('tour');
     } catch (err) { $('pwErr').innerHTML = `<div class="error">${esc(err.message)}</div>`; }
   });
 }
@@ -132,6 +134,7 @@ function route(view, replace = false) {
   if ((view === 'attendance' && !canAttendance()) || (view === 'plan' && !isAdmin())) view = 'home';
   S.scroll[S.view] = window.scrollY;
   S.view = view;
+  track('sezione', view);
   const h = view === 'home' ? '' : '#' + view;
   if (replace) history.replaceState(null, '', location.pathname + h); else if (location.hash !== h) history.pushState(null, '', location.pathname + h);
   closeSheet();
@@ -391,7 +394,7 @@ const tourSteps = () => [
   ['I tuoi turni', 'Mario assegna i turni. Su ogni tuo turno puoi toccare «Ci sono» o «Non ci sono». Non puoi assegnarti turni da solo né spostarli.'],
   ['Conferma e presenza sono diverse', 'Rispondere nell\'app non è la presenza ufficiale, e non rispondere non vuol dire essere assenti. Il registro cartaceo in piscina resta valido.'],
   ['Sostituzioni', '«Non ci sono» invia una richiesta a Mario, che sceglie il sostituto (anche concordandolo su WhatsApp).'],
-  ['Allenamenti', 'In prima pagina trovi l'allenamento di questa settimana, uguale per tutte le serate. Le schede pubblicate da Fabio e Mario si leggono, si stampano e si salvano in PDF. I contenuti tecnici non vanno modificati. Le schede delle stagioni passate restano nello «Storico allenamenti», dove puoi anche cercare per parola.'],
+  ['Allenamenti', 'In prima pagina trovi l\'allenamento di questa settimana, uguale per tutte le serate. Le schede pubblicate da Fabio e Mario si leggono, si stampano e si salvano in PDF. I contenuti tecnici non vanno modificati. Le schede delle stagioni passate restano nello «Storico allenamenti», dove puoi anche cercare per parola.'],
   ...(isAdmin() ? [['Pianifica turni', 'Dalla pagina iniziale apri «Pianifica turni». La prima volta imposti la stagione: da che giorno a che giorno, in che giorni e a che ora ci sono allenamenti e corsi. Poi, mese per mese, assegni chi segue ogni serata, anche «a tutti i mercoledì» con un tocco.'], ['Gestione Club', 'Staff e accessi, sostituzioni, registro presenze, esportazioni.']] : []),
   ...(isAdmin() ? [['Disponibilità dello staff', 'In «Pianifica turni», dopo aver impostato la stagione, scegli tra «Per singola serata» e «Calendario del mese»: una tabella con lo staff sulle righe e le serate sulle colonne, dove vedi chi è disponibile (sì / no) e assegni o togli con un tocco. Se qualcuno non ha ancora dichiarato le disponibilità, in Gestione Club trovi l\'elenco e il promemoria già scritto da mandare su WhatsApp. L\'app ti avvisa se assegni chi ha detto di non esserci o chi ha allenato il mese prima (mese di scarico, indicazione di buon senso).']] : []),
   ...(canWorkouts() ? [['Caricare un allenamento', 'In «Allenamenti» tocca «Carica PDF». L\'app propone le schede: confrontale con l\'originale, correggi e solo dopo tocca «Approva e pubblica». Ogni scheda vale per una settimana, dal lunedì alla domenica. Tutte le schede restano nello storico: in «Idee dagli anni scorsi» trovi quelle dello stesso periodo delle stagioni passate e con «Riusa» le trasformi in una nuova bozza da adattare.']] : []),
