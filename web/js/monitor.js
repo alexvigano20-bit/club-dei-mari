@@ -8,7 +8,7 @@
 import { rpc } from './api.js';
 import { $, S, A } from './core.js';
 
-export const APP_VERSION = '2026-11-12-1';
+export const APP_VERSION = '2026-11-12-2';
 
 const queue = [];
 let timer = null;

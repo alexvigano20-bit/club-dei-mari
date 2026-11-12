@@ -17,6 +17,7 @@ let calMonthsBack = 0;
 
 // ======================= AVVIO =======================
 async function boot() {
+  window.__cdmStarted = true;
   registerSW();
   wireEvents();
   startMonitor(); hooks.onActError = trackError;

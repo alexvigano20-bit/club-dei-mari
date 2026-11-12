@@ -259,6 +259,31 @@ reset role;
 select test.ok((select count(*) from public.usage_events where profile_id = :'i1') = 31, 'Registro: al massimo 30 eventi per invio, tipi sconosciuti scartati');
 select test.ok((select (x->>'errors_30')::int = 1 and x->>'last_open' is not null from jsonb_array_elements(public.app_usage_report()->'people') x where x->>'name' = (select display_name from public.profiles where id = :'i1')), 'Registro: riepilogo per gli sviluppatori dal database');
 
+-- Strumenti di ripristino per sviluppatori (schema dev)
+reset role;
+set role authenticated; select set_config('request.jwt.claim.sub', :'mario', false);
+select test.fails($$select dev.take_snapshot('x')$$, 'Ripristino: nessun accesso dall''app (nemmeno il responsabile)');
+reset role;
+create temp table snap as select dev.take_snapshot('test') id, clock_timestamp() t0;
+create temp table before as select (select count(*) from public.assignments where removed_at is null) a, (select count(*) from public.attendance_records) p,
+  (select jsonb_agg(to_jsonb(x) - 'updated_at' order by id) from public.activities x) acts;
+-- «Mario fa un pasticcio»: toglie tutti i turni, cambia gli orari delle serate e registra presenze
+set role authenticated; select set_config('request.jwt.claim.sub', :'mario', false);
+select count(public.admin_unassign(id)) from public.assignments where removed_at is null;
+reset role;
+update public.activities set notes = 'PASTICCIO' where true; -- come Mario (stesso utente nel registro)
+select test.ok((select count(*) from dev.changes((select t0 from snap), 'Mario') where tabella = 'assignments') >= 1, 'Ripristino: «chi ha fatto cosa» elenca le modifiche di Mario');
+select test.ok((select sum(da_aggiornare) from dev.restore((select id from snap), array['turni'])) >= 1
+  and (select count(*) from public.assignments where removed_at is null) = 0, 'Ripristino: la prova (dry run) conta senza cambiare nulla');
+select test.fails($$select * from dev.restore((select id from snap), array['inventato'], dry_run => false)$$, 'Ripristino: gruppo sconosciuto rifiutato');
+select * from dev.restore((select id from snap), array['turni'], dry_run => false);
+select test.ok((select count(*) from public.assignments where removed_at is null) = (select a from before)
+  and exists (select 1 from public.activities where notes = 'PASTICCIO'), 'Ripristino parziale: turni ripristinati, il resto invariato');
+select * from dev.undo('Mario', (select t0 from snap), array['calendario'], dry_run => false);
+select test.ok((select jsonb_agg(to_jsonb(x) - 'updated_at' order by id) from public.activities x) = (select acts from before)
+  and (select count(*) from public.assignments where removed_at is null) = (select a from before), 'Annulla le azioni di una persona: serate riportate com''erano');
+select test.ok((select count(*) from dev.snapshots where label like 'sicurezza prima%') = 2, 'Ripristino: fotografia di sicurezza prima di ogni ripristino');
+
 reset role;
 \echo
 select case when ok then 'OK   ' else 'FAIL ' end || name || coalesce('  ['||detail||']','') as risultato from test.results order by n;

@@ -64,3 +64,17 @@ La tabella dei permessi è in SQL e si porta con sé.
 - **Nell'app:** Mario apre «Gestisci» sul nuovo responsabile e attiva «Responsabile». Deve sempre restare almeno un responsabile attivo: il database lo impone.
 - **Su Supabase:** aggiungi il nuovo referente come Owner dell'organizzazione (Organization → Team). Solo dopo rimuovi il precedente.
 - Non esistono accessi nascosti o «di servizio» nell'app.
+
+
+## Strumenti di ripristino per gli sviluppatori (dal 12/11/2026)
+Schema `dev`, usabile solo dal database (assistente o SQL Editor di Supabase), mai dall'app.
+- Chi ha fatto cosa: `select * from dev.changes(since => now() - interval '2 days', who => 'Mario');`
+- Fotografie: una automatica ogni notte alle 3:50 (ne restano 30), più quelle manuali: `select dev.take_snapshot('prima di ...');` — elenco: `select id, at, label from dev.snapshots order by at desc;`
+- Ripristino da fotografia, totale o per gruppi (stagione, calendario, turni, presenze, disponibilita, allenamenti, bacheca, staff, tutto). Prima la prova, poi quello vero:
+  `select * from dev.restore(<id>, array['turni']);` poi `select * from dev.restore(<id>, array['turni'], dry_run => false);`
+- Annullare le azioni di una persona da un certo momento: `select * from dev.undo('Mario', since => '2026-11-20 21:00+01', groups => array['turni']);` (prova) e poi con `dry_run => false`. Le righe modificate dopo da altre persone vengono saltate e segnalate.
+- Ogni operazione vera scatta prima una fotografia di sicurezza (si torna indietro con `dev.restore` su quella), lavora in una sola transazione e annulla tutto se resterebbero collegamenti rotti. I ripristini compaiono nel registro modifiche come «Ripristino dati (sviluppatori)».
+- Lo staff non viene mai creato o cancellato dai ripristini (solo nomi, ruoli e stato attivo). I PDF originali non vengono toccati.
+
+## Avvio sicuro
+`web/js/boot.js`: se l'app non parte entro 10 secondi mostra «L'app non si è avviata» con un pulsante che svuota la memoria dell'app sul telefono e la ricarica. `tests/syntax_check.sh` blocca la pubblicazione se il codice ha errori di sintassi.

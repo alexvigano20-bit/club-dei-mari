@@ -140,7 +140,7 @@ async function loadAdmin() {
   try { G.adminData = await rpc('app_admin'); R.render(); } catch (e) { toast(e.message, true); }
 }
 
-const TABLES = { assignments: 'Turno', activities: 'Attività', attendance_records: 'Presenza', profiles: 'Staff', replacement_requests: 'Sostituzione',
+const TABLES = { dev: 'Ripristino dati (sviluppatori)', assignments: 'Turno', activities: 'Attività', attendance_records: 'Presenza', profiles: 'Staff', replacement_requests: 'Sostituzione',
   availability_responses: 'Risposta', workouts: 'Allenamento', workout_files: 'PDF', announcements: 'Comunicazione', profile_private: 'Contatti' };
 function auditLine(l) {
   const n = l.new || {}, o = l.old || {};
