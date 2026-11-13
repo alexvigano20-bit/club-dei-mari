@@ -2,7 +2,7 @@
 // Mette in cache SOLO i file dell'app (interfaccia). I dati del club (turni,
 // allenamenti, PDF) NON passano mai da questa cache: arrivano dal server con
 // l'autorizzazione dell'utente, così una revoca ha effetto anche offline-online.
-const VERSION = 'cdm-shell-2026-11-13-3';
+const VERSION = 'cdm-shell-2026-11-13-4';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/boot.js', './js/core.js', './js/api.js', './js/config.js', './js/admin.js', './js/workouts.js', './js/workout-parse.js', './js/availability.js', './js/icons.js', './js/monitor.js',

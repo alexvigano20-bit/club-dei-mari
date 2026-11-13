@@ -18,8 +18,29 @@ export function renderWork(main) {
   ({ list: listView, read: readView, review: reviewView, upload: uploadView })[W.mode](main);
 }
 
+// Impaginazione delle righe (solo aspetto, il testo resta identico):
+// totale della serie in evidenza, esercizi della serie rientrati, quantità in colonna,
+// recuperi in corsivo, istruzioni in corsivo, «ritorno:» come definizione.
+const RE_SET = /^\d+(?:[.,]\d+)?\s*mt?\s+totali$/i;
+const RE_RESTL = /^(?:\+\s*)?\d+\s*min\s+recupero|^recupero\b/i;
+function bodyHtml(body) {
+  let inSet = false;
+  return String(body).split('\n').map((raw) => {
+    const t = raw.trim();
+    if (!t) { inSet = false; return '<div class="wl-gap"></div>'; }
+    if (RE_SET.test(t)) { inSet = true; return `<div class="wl-set">${esc(t)}</div>`; }
+    if (RE_RESTL.test(t)) return `<div class="wl-rest">${esc(t)}</div>`;
+    const def = t.match(/^ritorno\s*:\s*(.*)$/i);
+    if (def) return `<div class="wl-def"><b>ritorno:</b> ${esc(def[1])}</div>`;
+    const q = t.match(/^(\d+(?:[.,]\d+)?mt|\d+\s*x)\s+(.*)$/i);
+    if (inSet) return `<div class="wl-in">${esc(t)}</div>`;
+    if (q && (/\t/.test(raw) || /x$/i.test(q[1]))) return `<div class="wl-item"><span class="wl-q">${esc(q[1])}</span>${esc(q[2])}</div>`;
+    if (!/^[\d~+]/.test(t)) return `<div class="wl-note">${esc(t)}</div>`;
+    return `<div>${esc(t)}</div>`;
+  }).join('');
+}
 const blocksHtml = (v) => `${v.summary ? `<p class="summary">${esc(v.summary)}</p>` : ''}${(v.blocks || []).map((b) =>
-  `<div class="workblock">${b.title ? `<b>${esc(b.title)}</b>` : ''}${b.body ? `<div class="body">${esc(b.body)}</div>` : ''}</div>`).join('')}`;
+  `<div class="workblock">${b.title ? `<b>${esc(b.title)}</b>` : ''}${b.body ? `<div class="body">${bodyHtml(b.body)}</div>` : ''}</div>`).join('')}`;
 
 // ---------------- ELENCO ----------------
 // Stagione sportiva da settembre ad agosto: «2026/27»

@@ -50,7 +50,7 @@ const fmtReps = (t) => t.replace(/^(\d+)\s*[x×]\s*/i, '$1 x ');
 function itemLines(text) {
   const m = text.match(/^(\d+(?:[.,]\d+)?)\s*m\b\s*(.*)$/i);
   if (m && /^[~\d]/.test(m[2])) return { set: true, lines: [`${m[1]}mt totali`, fmtUnits(m[2])] };
-  if (m) return { set: false, lines: [`${m[1]}mt\t\t${fmtUnits(m[2])}`] };
+  if (m) return { set: false, lines: [`${m[1]}mt\t${fmtUnits(m[2])}`] };
   return { set: false, lines: [fmtUnits(fmtReps(text))] };
 }
 
@@ -108,8 +108,9 @@ export function parseWorkouts(rawLines, fallbackTitle = 'Allenamento') {
   };
   const addBody = (lines2, opts = {}) => {
     if (!block || block.closed || block.kind === 'fine') { block = newBlock(''); w.blocks.push(block); }
-    if (block.body.length && (opts.set || !block.items) && block.body[block.body.length - 1] !== '') block.body.push('');
-    block.body.push(...lines2); block.items++;
+    // riga vuota: prima di ogni serie, dopo le istruzioni, e quando un esercizio singolo segue una serie
+    if (block.body.length && (opts.set || !block.items || block.lastSet) && block.body[block.body.length - 1] !== '') block.body.push('');
+    block.body.push(...lines2); block.items++; block.lastSet = !!opts.set;
   };
 
   for (const { text, joined, afterPlus, restLine } of lines) {
