@@ -118,6 +118,18 @@ try {
   await fabio.page.check('#pubCheck'); await fabio.page.click('#pubBtn');
   await fabio.page.waitForSelector('text=SCHEDA APPROVATA'); await shot(fabio, '15-scheda-pubblicata');
   ok(true, 'Fabio approva e pubblica');
+  // Il testo scritto in un blocco non si perde se l'app si aggiorna da sola (ogni 5 minuti o al ritorno da un'altra app)
+  await fabio.page.click('button:has-text("Tutti gli allenamenti")'); await fabio.page.waitForSelector('h3:has-text("Schede di questa stagione")');
+  await fabio.page.locator('[data-act="wRead"]').first().click(); await fabio.page.locator('[data-act="wReview"]').first().click(); await fabio.page.waitForSelector('textarea[data-change="bBody"]');
+  const ta = fabio.page.locator('textarea[data-change="bBody"]').first(); await ta.click(); await ta.press('End'); await ta.type(' PROVA-NON-PERDERE');
+  await fabio.page.evaluate(() => { Object.defineProperty(document, 'hidden', { value: true, configurable: true }); document.dispatchEvent(new Event('visibilitychange')); Object.defineProperty(document, 'hidden', { value: false, configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
+  await fabio.page.waitForTimeout(1500);
+  ok((await fabio.page.locator('textarea[data-change="bBody"]').first().inputValue()).includes('PROVA-NON-PERDERE'), 'Revisione: il testo in scrittura non si perde quando l\'app si aggiorna');
+  await fabio.page.goto(APP + '#work'); await fabio.page.reload(); await fabio.page.waitForSelector('text=Modifiche non salvate');
+  ok(true, 'Revisione: dopo una ricarica della pagina l\'app propone di riprendere le modifiche');
+  await fabio.page.click('text=Riprendi da dove eri rimasto'); await fabio.page.waitForSelector('textarea[data-change="bBody"]');
+  ok((await fabio.page.locator('textarea[data-change="bBody"]').first().inputValue()).includes('PROVA-NON-PERDERE'), 'Revisione: modifiche recuperate dopo la ricarica');
+  await fabio.page.click('[data-act="wList"]');
   ok(await fabio.page.isVisible('text=Settimana dal'), 'Scheda pubblicata: indica la settimana in cui si usa');
   // stesso PDF ricaricato (con le settimane nuove in fondo): le schede già presenti non vengono riproposte
   await fabio.page.goto(APP + '#work'); await fabio.page.reload(); await fabio.page.waitForSelector('h3:has-text("Schede di questa stagione")');

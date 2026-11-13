@@ -32,6 +32,8 @@ const dm = (iso) => new Date(iso + 'T12:00').toLocaleDateString('it-IT', { day: 
 export const weekLabel = (iso) => `settimana dal ${dm(iso)} al ${dm(addDays(iso, 6))}`;
 const normT = (t) => (t || '').toLowerCase().replace(/[\u2013\u2014-]+/g, ' ').replace(/\s+/g, ' ').trim();
 // Schede pubblicate per la settimana in corso (di solito una)
+// Revisione aperta: l'app non deve ridisegnarla da sola (si perderebbe ciò che si sta scrivendo)
+export const isEditingWorkout = () => W.mode === 'review' || W.mode === 'upload';
 export const thisWeekWorkouts = () => { const m = mondayOf(todayISO()); return (S.workouts || []).filter((w) => w.status === 'pubblicato' && w.published && w.week_of === m); };
 // Scheda pubblicata per la settimana di una data (per il giorno nel calendario e per i turni)
 export const workoutForDate = (iso) => { const m = mondayOf(iso); return (S.workouts || []).find((w) => w.status === 'pubblicato' && w.published && w.week_of === m); };
@@ -51,6 +53,10 @@ const pubCard = (w, old) => `<button class="card" style="width:100%;text-align:l
     <p class="small">${w.week_of ? `<b>${esc(weekLabel(w.week_of))}</b> · ` : ''}Pubblicata ${esc(dt(w.published_at))}${w.published_by ? ' da ' + esc(w.published_by) : ''}</p></button>`;
 const histItem = (w) => `<button class="histitem" data-act="wRead" data-id="${w.id}" data-text="${esc(plain(w))}"><b>${esc(w.published?.title || w.title)}</b><span>${esc(dayY(pubDate(w)))}</span></button>`;
 
+// Bozze con modifiche rimaste solo su questo dispositivo (es. il telefono ha ricaricato la pagina)
+function pendingLocal() {
+  return (S.workouts || []).filter((w) => { try { const l = JSON.parse(localStorage.getItem(editKey(w.id)) || 'null'); return l && l.base === (w.current_version_id || null); } catch { return false; } });
+}
 function listView(main) {
   const all = S.workouts || [];
   const today = todayISO(), cur = seasonOf(today);
@@ -67,6 +73,8 @@ function listView(main) {
       <label class="btn" for="pdfInput" style="width:100%;font-size:18px">Carica PDF</label>
       <input id="pdfInput" type="file" accept="application/pdf,.pdf" class="hidden" data-change="pdfPicked">
       <button class="ghost" style="width:100%" data-act="newBlank">oppure crea una scheda scrivendo il testo</button></div>` : ''}
+    ${canWorkouts() ? pendingLocal().map((w) => `<div class="card alert"><b>Modifiche non salvate</b> su «${esc(w.title)}» (rimaste su questo dispositivo).
+      <button style="width:100%;margin-top:8px" data-act="wReview" data-id="${w.id}">Riprendi da dove eri rimasto</button></div>`).join('') : ''}
     ${ideas.length ? `<div class="card"><span class="pill">SOLO FABIO E MARIO</span><h3>Idee dagli anni scorsi</h3>
       <p class="small">Schede pubblicate in questo periodo nelle stagioni passate. «Riusa» crea una nuova bozza da adattare: nulla viene pubblicato senza la tua approvazione.</p>
       ${ideas.map((w) => `<div class="checkline"><span class="who"><b>${esc(w.published.title)}</b><br><span class="small">Stagione ${esc(seasonOf(pubDate(w)))} · ${esc(dayY(pubDate(w)))}</span></span>
@@ -288,15 +296,15 @@ function reviewView(main) {
         <button class="alt sm" data-act="srcApply">Usa questo testo</button> <button class="alt sm" data-act="reparse">Riproponi la suddivisione</button></details>
     </section>`;
   const editPanel = `<section><h3>Scheda proposta</h3>
-      <label for="wTitle">Titolo</label><input id="wTitle" maxlength="120" value="${esc(e.title)}" data-change="edTitle">
-      <label for="wSummary">Indicazioni generali (distanza, attrezzatura, partenza…)</label><textarea id="wSummary" rows="4" data-change="edSummary">${esc(e.summary)}</textarea>
+      <label for="wTitle">Titolo</label><input id="wTitle" maxlength="120" value="${esc(e.title)}" data-change="edTitle" data-live>
+      <label for="wSummary">Indicazioni generali (distanza, attrezzatura, partenza…)</label><textarea id="wSummary" rows="4" data-change="edSummary" data-live>${esc(e.summary)}</textarea>
       ${e.blocks.map((b, i) => `<div class="blockedit ${b.uncertain ? 'uncertain' : ''}">
         <div class="row" style="justify-content:space-between;align-items:center"><b>Blocco ${i + 1}</b>
           <span><button class="ghost sm" data-act="bUp" data-i="${i}" aria-label="Sposta su" ${i ? '' : 'disabled'}>↑</button><button class="ghost sm" data-act="bDown" data-i="${i}" aria-label="Sposta giù" ${i < e.blocks.length - 1 ? '' : 'disabled'}>↓</button>
           <button class="ghost sm" data-act="bDel" data-i="${i}" aria-label="Elimina blocco">Elimina</button></span></div>
         ${b.uncertain ? `<div class="alert small">⚠︎ ${esc(b.note || 'Passaggio da verificare')}<br><button class="ok sm" data-act="bOk" data-i="${i}">Ho verificato questo blocco</button></div>` : ''}
-        <label>Titolo / indicazione</label><input value="${esc(b.title)}" data-change="bTitle" data-i="${i}" maxlength="200">
-        <label>Esercizi (una riga per esercizio)</label><textarea data-change="bBody" data-i="${i}">${esc(b.body || '')}</textarea>
+        <label>Titolo / indicazione</label><input value="${esc(b.title)}" data-change="bTitle" data-live data-i="${i}" maxlength="200">
+        <label>Esercizi (una riga per esercizio)</label><textarea data-change="bBody" data-live data-i="${i}">${esc(b.body || '')}</textarea>
         <button class="ghost sm" data-act="bFlag" data-i="${i}">${b.uncertain ? '' : '⚑︎ Segna come da verificare'}</button></div>`).join('')}
       <button class="alt" style="width:100%" data-act="bAdd">＋ Aggiungi blocco</button>
       <div id="integ">${integrityHtml()}</div>

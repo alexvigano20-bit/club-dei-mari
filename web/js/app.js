@@ -6,7 +6,7 @@ import {
   addMonths, hhmm, dt, KIND, activityLabel, isAdmin, canWorkouts, canAttendance, staffName, activeStaff,
   myAssignments, responseOf, openRequests, printHtml, printHeader, openSheet, closeSheet, sheetOpen, defaultRange, hooks } from './core.js';
 import { startMonitor, track, trackError } from './monitor.js';
-import { renderWork, thisWeekWorkouts, workoutLinkHtml, weekLabel } from './workouts.js';
+import { renderWork, isEditingWorkout, thisWeekWorkouts, workoutLinkHtml, weekLabel } from './workouts.js';
 import { iconMine, iconWork, iconCal, iconNotices, NAV_ICONS } from './icons.js';
 import { renderAvail, homeAvailBanner } from './availability.js';
 import { renderAdmin, renderAttendance, renderPlan, dayAdminHtml, replacementForm } from './admin.js';
@@ -51,7 +51,10 @@ async function recheck() {
   try {
     const me = await rpc('whoami');
     if (!me) return handleAuthFailure(new ApiError('revocato', { code: 'revoked' }));
-    await loadState(); if (!sheetOpen()) R.render();
+    await loadState();
+    // mai ridisegnare mentre qualcuno scrive o rivede una scheda: perderebbe il testo
+    const typing = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+    if (!sheetOpen() && !typing && !(S.view === 'work' && isEditingWorkout())) R.render();
   } catch (e) { if (!e.offline) handleAuthFailure(e); }
 }
 
@@ -430,6 +433,8 @@ function wireEvents() {
     const fn = A[el.dataset.act]; if (fn) { e.preventDefault(); fn(el, e); }
   });
   document.addEventListener('change', (e) => { const el = e.target.closest('[data-change]'); if (el) A[el.dataset.change]?.(el, e); });
+  // campi «vivi»: il testo viene memorizzato a ogni tasto, non solo quando si esce dal campo
+  document.addEventListener('input', (e) => { const el = e.target.closest('[data-live]'); if (el) A[el.dataset.change]?.(el, e); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sheetOpen()) closeSheet(); });
   $('guideBtn').addEventListener('click', () => { tourStep = 0; route('tour'); });
   document.querySelectorAll('.bottomnav button').forEach((b) => b.addEventListener('click', () => route(b.dataset.view)));
