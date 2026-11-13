@@ -153,7 +153,7 @@ function render() {
   const n = openRequests().length + 0;
   $('noticeBadge').textContent = n; $('noticeBadge').classList.toggle('hidden', !n || !isAdmin());
   renderBanner();
-  $('app').classList.toggle('wide', S.view === 'work');
+  $('app').classList.toggle('wide', S.view === 'work' || S.view === 'plan' || S.view === 'attendance');
   const main = $('main');
   ({ home: renderHome, mine: renderMine, work: renderWork, calendar: renderCalendar, notices: renderNotices,
      admin: renderAdmin, attendance: renderAttendance, plan: renderPlan, avail: renderAvail, tour: renderTour })[S.view](main);
