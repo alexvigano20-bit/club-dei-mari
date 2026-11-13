@@ -12,6 +12,11 @@ Continua a scrivere gli allenamenti come fai ora e a esportarli in PDF. L'app no
 5. **«Approva e pubblica»** si attiva solo quando non ci sono blocchi da verificare e hai spuntato «Ho confrontato la scheda con il PDF originale…». Lo staff vede solo la scheda approvata: il PDF originale resta archiviato per te e Mario.
 6. Per correggere una scheda già pubblicata: «Modifica (nuova bozza)». Lo staff continua a vedere la versione approvata finché non pubblichi la nuova. «Ritira pubblicazione» la nasconde senza cancellarla.
 
+## Come l'app impagina il PDF (regole decise con Alessandro, 13/11/2026)
+- Un esercizio per riga; il totale di ogni serie su una riga a sé («200mt totali») con gli esercizi sotto; una riga vuota fra le serie; i recuperi («Recupero completo», «+ 2min recupero al muro») in fondo al loro gruppo; «m» scritto «mt»; «1x» scritto «1 x»; la definizione «ritorno: …» in fondo al blocco.
+- I nomi dei blocchi che non sono nel PDF vengono proposti (RISCALDAMENTO, RISCALDAMENTO APNEA, APNEE IN ESPIRAZIONE, APNEE CON 1 RESPIRO, APNEE, APNEA FINALE, FINE) e vanno confermati a mano con «Ho verificato questo blocco».
+- Distanze, tempi, ripetizioni e ordine non vengono mai cambiati: le modifiche di contenuto le fa solo una persona in revisione.
+
 ## Una scheda per settimana
 - Ogni scheda vale per **una settimana, dal lunedì alla domenica**, uguale per tutte le serate. Quando carichi il PDF scegli da quale settimana parte la prima scheda selezionata: le altre prendono le settimane successive, in ordine. In revisione puoi cambiare la settimana di ogni scheda.
 - Lo staff trova in prima pagina «Allenamento: … · QUESTA SETTIMANA» e il collegamento alla scheda dentro ogni serata di allenamento del calendario e dei propri turni.

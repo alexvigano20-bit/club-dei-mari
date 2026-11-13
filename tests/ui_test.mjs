@@ -153,7 +153,7 @@ try {
   await nav(i2, 'Allenamenti'); await i2.page.waitForSelector('text=PUBBLICATA');
   ok(!(await i2.page.isVisible('text=Carica PDF')), 'Istruttore: niente caricamento PDF');
   await i2.page.click('button.card:has-text("Settimana 1")'); await i2.page.waitForSelector('text=SCHEDA APPROVATA');
-  ok(await i2.page.isVisible('.workblock:has-text("200m 25m Snorkel LENTO")'), 'Contenuto tecnico identico al PDF');
+  ok(await i2.page.isVisible('.workblock:has-text("200mt totali")') && await i2.page.isVisible('.workblock:has-text("25mt Snorkel LENTO + 25mt DYN + virata")'), 'Contenuto tecnico identico al PDF, impaginato (totale della serie su una riga)');
   await shot(i2, '16-scheda-istruttore');
   await i2.page.click('button:has-text("Stampa / Salva PDF")'); ok((await printed(i2, 1)).includes('workblock'), 'Stampa scheda allenamento');
   ok(await i2.page.locator('button:has-text("PDF originale")').count() === 0, 'Staff: nessun accesso al PDF originale (decisione Mario)');
